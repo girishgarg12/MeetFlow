@@ -425,7 +425,7 @@ export default function MeetingRoom() {
             }}
           >
             <span style={{ color: '#9ca3af', fontSize: '12px', fontFamily: 'monospace' }}>
-              {id}
+              Invite Link
             </span>
             <button
               id="copy-meeting-link-btn"
