@@ -4,6 +4,15 @@ import { Clock, Copy, ExternalLink, CheckCircle, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+const parseUTCDate = (dateStr) => {
+  if (!dateStr) return null;
+  let normalized = dateStr;
+  if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && !/-\d{2}:\d{2}$/.test(dateStr)) {
+    normalized = dateStr + 'Z';
+  }
+  return new Date(normalized);
+};
+
 export default function MeetingCard({ meeting, type, onDelete, onViewDetails }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -20,7 +29,7 @@ export default function MeetingCard({ meeting, type, onDelete, onViewDetails }) 
   const formatTime = (dateStr) => {
     if (!dateStr) return 'N/A';
     try {
-      return format(new Date(dateStr), 'MMM d, yyyy · h:mm a');
+      return format(parseUTCDate(dateStr), 'MMM d, yyyy · h:mm a');
     } catch {
       return 'N/A';
     }
@@ -124,7 +133,7 @@ export default function MeetingCard({ meeting, type, onDelete, onViewDetails }) 
           {copied ? <CheckCircle size={15} /> : <Copy size={15} />}
         </button>
 
-        {type === 'recent' && onDelete && (
+        {onDelete && (
           <button
             onClick={(e) => {
               e.stopPropagation();

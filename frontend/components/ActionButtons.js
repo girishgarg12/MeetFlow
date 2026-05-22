@@ -1,5 +1,5 @@
 'use client';
-import { Video, Plus, Calendar, ChevronDown } from 'lucide-react';
+import { Video, Plus, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createMeeting, joinMeeting } from '@/lib/api';
 import { useState, useEffect } from 'react';
@@ -153,7 +153,6 @@ export default function ActionButtons() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '3px',
               cursor: 'pointer',
             }}
             onClick={handleNewMeeting}
@@ -161,7 +160,6 @@ export default function ActionButtons() {
             <span style={{ fontSize: '12px', fontWeight: 500, color: '#5b5b66' }}>
               {creating ? 'Creating...' : 'New meeting'}
             </span>
-            <ChevronDown size={12} color="#5b5b66" style={{ marginTop: '1px' }} />
           </div>
         </div>
 

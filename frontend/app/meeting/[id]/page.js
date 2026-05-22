@@ -4,11 +4,29 @@ import { useRouter, useParams } from 'next/navigation';
 import {
   Mic, MicOff, Video, VideoOff, Phone,
   Users, MessageSquare, Shield, Copy, Check,
-  Wifi, WifiOff, Loader2
+  Wifi, WifiOff, Loader2, ChevronUp, Smile,
+  MoreHorizontal, LayoutGrid, ShieldCheck
 } from 'lucide-react';
 import { getMeeting, getParticipants, endMeeting, leaveMeeting } from '@/lib/api';
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+
+const getAvatarColor = (name) => {
+  const colors = [
+    '#e05638', // Zoom-style orange/red
+    '#0f75bc', // Zoom-style blue
+    '#7f3f98', // Zoom-style purple
+    '#00a651', // Zoom-style green
+    '#ea580c', // Orange
+    '#2563eb'  // Blue
+  ];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
 
 export default function MeetingRoom() {
   const router = useRouter();
@@ -20,7 +38,9 @@ export default function MeetingRoom() {
   const [isMuted, setIsMuted]                   = useState(false);
   const [isVideoOff, setIsVideoOff]             = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [copied, setCopied]                     = useState(false);
+  const [copiedId, setCopiedId]                 = useState(false);
+  const [copiedLink, setCopiedLink]             = useState(false);
+  const [showInvitePopup, setShowInvitePopup]   = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting | connected | error | disconnected
   const [cameraError, setCameraError]           = useState(false);
   const [initDone, setInitDone]                 = useState(false);
@@ -419,10 +439,21 @@ export default function MeetingRoom() {
     router.push('/');
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/meeting/${id}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const copyMeetingId = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2500);
+    }
+  };
+
+  const copyMeetingLink = () => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      const origin = window.location.origin;
+      navigator.clipboard.writeText(`${origin}/meeting/${id}`);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   // ─── STATUS HELPERS ────────────────────────────────────────
@@ -484,7 +515,7 @@ export default function MeetingRoom() {
     <div
       style={{
         height: '100vh',
-        background: '#111827',
+        background: '#0c0c0c',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -496,40 +527,41 @@ export default function MeetingRoom() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 20px',
-          background: '#1f2937',
-          borderBottom: '1px solid #374151',
+          padding: '8px 20px',
+          background: '#000000',
+          borderBottom: '1px solid #141414',
+          height: '46px',
           flexShrink: 0,
         }}
       >
-        {/* Left: meeting info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
-              borderRadius: '8px',
-              padding: '5px 8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Video size={14} color="#fff" />
+        {/* Left: MeetFlow branding & meeting info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span style={{ color: '#ffffff', fontWeight: 700, fontSize: '14px', letterSpacing: '-0.3px' }}>
+              MeetFlow
+            </span>
+            <span style={{ color: '#8e8e8f', fontWeight: 400, marginLeft: '4px', fontSize: '12px' }}>
+              Workplace
+            </span>
           </div>
-          <span style={{ color: '#f9fafb', fontWeight: 600, fontSize: '15px' }}>
+          
+          <div style={{ width: '1px', height: '14px', background: '#333333' }} />
+
+          <span style={{ color: '#e5e7eb', fontWeight: 500, fontSize: '13px' }}>
             {meeting?.title || 'Meeting Room'}
           </span>
+
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: '#374151',
-              borderRadius: '6px',
-              padding: '4px 10px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '4px',
+              padding: '3px 8px',
             }}
           >
-            <span style={{ color: '#9ca3af', fontSize: '12px', fontFamily: 'monospace' }}>
+            <span style={{ color: '#a3a3a3', fontSize: '11px', fontWeight: 500 }}>
               Invite Link
             </span>
             <button
@@ -540,26 +572,27 @@ export default function MeetingRoom() {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: copied ? '#10b981' : '#6b7280',
+                color: copied ? '#10b981' : '#8e8e8f',
                 padding: '0',
                 display: 'flex',
                 alignItems: 'center',
                 transition: 'color 0.15s',
               }}
             >
-              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? <Check size={12} /> : <Copy size={12} />}
             </button>
           </div>
+
           {isHost && (
             <span
               style={{
-                background: '#0B5CFF22',
+                background: 'rgba(11, 92, 255, 0.15)',
                 color: '#60a5fa',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 600,
-                padding: '3px 8px',
-                borderRadius: '100px',
-                border: '1px solid #1d4ed844',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                border: '1px solid rgba(29, 78, 216, 0.3)',
               }}
             >
               HOST
@@ -567,25 +600,58 @@ export default function MeetingRoom() {
           )}
         </div>
 
-        {/* Right: connection status + time */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: statusColor[connectionStatus] || '#6b7280',
-                boxShadow: `0 0 6px ${statusColor[connectionStatus] || '#6b7280'}`,
-              }}
-            />
-            <span style={{ color: '#9ca3af', fontSize: '12px' }}>
-              {statusLabel[connectionStatus] || connectionStatus}
-            </span>
+        {/* Center/Right: Secure Connection Shield & View Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Green Secure Connection Shield */}
+          <div 
+            title={statusLabel[connectionStatus] || connectionStatus}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              cursor: 'help',
+              transition: 'opacity 0.15s'
+            }}
+          >
+            {connectionStatus === 'connected' ? (
+              <ShieldCheck size={18} color="#10b981" />
+            ) : (
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: statusColor[connectionStatus] || '#6b7280',
+                  boxShadow: `0 0 6px ${statusColor[connectionStatus] || '#6b7280'}`,
+                }}
+              />
+            )}
           </div>
-          <span style={{ color: '#4b5563', fontSize: '12px' }}>
-            {meeting?.duration && `${meeting.duration} min`}
-          </span>
+
+          <div style={{ width: '1px', height: '14px', background: '#333333' }} />
+
+          {/* Zoom View Dropdown Toggle */}
+          <button
+            id="view-toggle-btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              color: '#f3f4f6',
+              fontSize: '12px',
+              fontWeight: 500,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+          >
+            <LayoutGrid size={13} color="#f3f4f6" />
+            <span>View</span>
+          </button>
         </div>
       </div>
 
@@ -631,13 +697,11 @@ export default function MeetingRoom() {
             {/* Local (self) video */}
             <div
               style={{
-                background: '#1f2937',
-                borderRadius: '14px',
+                background: '#161616',
+                borderRadius: '8px',
                 overflow: 'hidden',
                 position: 'relative',
-                border: '2px solid #374151',
-                // When alone, add a subtle inner glow
-                boxShadow: totalTiles === 1 ? '0 0 0 1px #374151 inset' : 'none',
+                border: '1px solid #2d2d2d',
                 // 3-tile: take top-left cell
                 ...(totalTiles === 3 ? { gridArea: 'a' } : {}),
               }}
@@ -674,22 +738,21 @@ export default function MeetingRoom() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#1f2937',
+                    background: '#161616',
                   }}
                 >
                   <div
                     style={{
-                      width: '72px',
-                      height: '72px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
+                      width: '76px',
+                      height: '76px',
+                      borderRadius: '8px',
+                      background: getAvatarColor(userName),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '28px',
+                      fontSize: '32px',
                       fontWeight: 700,
                       color: '#fff',
-                      boxShadow: '0 4px 20px rgba(11,92,255,0.4)',
                     }}
                   >
                     {userName.charAt(0).toUpperCase()}
@@ -702,17 +765,18 @@ export default function MeetingRoom() {
                   position: 'absolute',
                   bottom: '10px',
                   left: '10px',
-                  background: 'rgba(0,0,0,0.6)',
-                  backdropFilter: 'blur(4px)',
+                  background: 'rgba(0, 0, 0, 0.55)',
+                  backdropFilter: 'blur(8px)',
                   color: '#fff',
                   fontSize: '12px',
                   fontWeight: 500,
-                  padding: '4px 10px',
-                  borderRadius: '100px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   zIndex: 2,
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
                 }}
               >
                 {isMuted && <MicOff size={11} color="#f87171" />}
@@ -725,11 +789,11 @@ export default function MeetingRoom() {
               <div
                 key={participant.name}
                 style={{
-                  background: '#1f2937',
-                  borderRadius: '14px',
+                  background: '#161616',
+                  borderRadius: '8px',
                   overflow: 'hidden',
                   position: 'relative',
-                  border: '2px solid #374151',
+                  border: '1px solid #2d2d2d',
                   // 3-tile: 2nd goes top-right, 3rd spans full bottom
                   ...(totalTiles === 3 && idx === 0 ? { gridArea: 'b' } : {}),
                   ...(totalTiles === 3 && idx === 1 ? { gridArea: 'c' } : {}),
@@ -758,21 +822,21 @@ export default function MeetingRoom() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#1f2937',
+                    background: '#161616',
                     zIndex: 0,
                     pointerEvents: 'none',
                   }}
                 >
                   <div
                     style={{
-                      width: '72px',
-                      height: '72px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      width: '76px',
+                      height: '76px',
+                      borderRadius: '8px',
+                      background: getAvatarColor(participant.name),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '28px',
+                      fontSize: '32px',
                       fontWeight: 700,
                       color: '#fff',
                     }}
@@ -786,14 +850,15 @@ export default function MeetingRoom() {
                     position: 'absolute',
                     bottom: '10px',
                     left: '10px',
-                    background: 'rgba(0,0,0,0.6)',
-                    backdropFilter: 'blur(4px)',
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    backdropFilter: 'blur(8px)',
                     color: '#fff',
                     fontSize: '12px',
                     fontWeight: 500,
-                    padding: '4px 10px',
-                    borderRadius: '100px',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
                     zIndex: 3, // above video (2) and avatar (0)
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
                   }}
                 >
                   {participant.name}
@@ -811,8 +876,8 @@ export default function MeetingRoom() {
           <div
             style={{
               width: '260px',
-              background: '#1f2937',
-              borderLeft: '1px solid #374151',
+              background: '#161616',
+              borderLeft: '1px solid #2d2d2d',
               display: 'flex',
               flexDirection: 'column',
               flexShrink: 0,
@@ -821,7 +886,7 @@ export default function MeetingRoom() {
             <div
               style={{
                 padding: '16px',
-                borderBottom: '1px solid #374151',
+                borderBottom: '1px solid #2d2d2d',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -841,9 +906,10 @@ export default function MeetingRoom() {
                     alignItems: 'center',
                     gap: '10px',
                     padding: '8px 10px',
-                    borderRadius: '10px',
+                    borderRadius: '6px',
                     marginBottom: '4px',
-                    background: p.name === userName ? '#0B5CFF22' : 'transparent',
+                    background: p.name === userName ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    border: p.name === userName ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid transparent',
                   }}
                 >
                   <div
@@ -851,10 +917,7 @@ export default function MeetingRoom() {
                       width: '34px',
                       height: '34px',
                       borderRadius: '50%',
-                      background:
-                        p.name === userName
-                          ? 'linear-gradient(135deg, #0B5CFF, #0047CC)'
-                          : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      background: getAvatarColor(p.name),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -899,8 +962,8 @@ export default function MeetingRoom() {
           <div
             style={{
               width: '320px',
-              background: '#1f2937',
-              borderLeft: '1px solid #374151',
+              background: '#161616',
+              borderLeft: '1px solid #2d2d2d',
               display: 'flex',
               flexDirection: 'column',
               flexShrink: 0,
@@ -910,7 +973,7 @@ export default function MeetingRoom() {
             <div
               style={{
                 padding: '16px',
-                borderBottom: '1px solid #374151',
+                borderBottom: '1px solid #2d2d2d',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -979,7 +1042,7 @@ export default function MeetingRoom() {
                       </span>
                       <div
                         style={{
-                          backgroundColor: isOwn ? '#0B5CFF' : '#374151',
+                          backgroundColor: isOwn ? '#0B5CFF' : '#2d2d2d',
                           color: '#ffffff',
                           borderRadius: '12px',
                           padding: '8px 12px',
@@ -1003,10 +1066,10 @@ export default function MeetingRoom() {
               onSubmit={sendChatMessage}
               style={{
                 padding: '12px 16px',
-                borderTop: '1px solid #374151',
+                borderTop: '1px solid #2d2d2d',
                 display: 'flex',
                 gap: '8px',
-                background: '#111827',
+                background: '#0f0f0f',
               }}
             >
               <input
@@ -1016,8 +1079,8 @@ export default function MeetingRoom() {
                 placeholder="Send a message..."
                 style={{
                   flex: 1,
-                  background: '#1f2937',
-                  border: '1px solid #374151',
+                  background: '#1d1d1d',
+                  border: '1px solid #2d2d2d',
                   borderRadius: '20px',
                   padding: '8px 16px',
                   color: '#ffffff',
@@ -1054,97 +1117,130 @@ export default function MeetingRoom() {
       {/* ── CONTROL BAR ── */}
       <div
         style={{
-          background: '#1f2937',
-          borderTop: '1px solid #374151',
-          padding: '14px 24px',
+          background: '#000000',
+          borderTop: '1px solid #1c1c1c',
+          padding: '12px 24px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
+          justifyContent: 'space-between',
           flexShrink: 0,
+          height: '80px',
+          position: 'relative',
         }}
       >
-        {/* Mute */}
-        <ControlButton
-          id="toggle-mute-btn"
-          onClick={toggleMute}
-          active={isMuted}
-          activeColor="#dc2626"
-          icon={isMuted ? <MicOff size={20} color="#fff" /> : <Mic size={20} color="#fff" />}
-          label={isMuted ? 'Unmute' : 'Mute'}
-        />
+        {/* Left spacer for perfect centering */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          {/* Empty to balance the layout and keep controls centered */}
+        </div>
 
-        {/* Video */}
-        <ControlButton
-          id="toggle-video-btn"
-          onClick={toggleVideo}
-          active={isVideoOff}
-          activeColor="#dc2626"
-          icon={isVideoOff ? <VideoOff size={20} color="#fff" /> : <Video size={20} color="#fff" />}
-          label={isVideoOff ? 'Start Video' : 'Stop Video'}
-        />
+        {/* Center: Main Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Mute */}
+          <ControlButton
+            id="toggle-mute-btn"
+            onClick={toggleMute}
+            active={isMuted}
+            icon={isMuted ? <MicOff size={20} color="#ef4444" /> : <Mic size={20} color="#fff" />}
+            label="Audio"
+            hasChevron={true}
+          />
 
-        {/* Security (placeholder) */}
-        <ControlButton
-          id="security-btn"
-          onClick={() => {}}
-          icon={<Shield size={20} color="#fff" />}
-          label="Security"
-        />
+          {/* Video */}
+          <ControlButton
+            id="toggle-video-btn"
+            onClick={toggleVideo}
+            active={isVideoOff}
+            icon={isVideoOff ? <VideoOff size={20} color="#ef4444" /> : <Video size={20} color="#fff" />}
+            label="Video"
+            hasChevron={true}
+          />
 
-        {/* Participants toggle */}
-        <ControlButton
-          id="toggle-participants-btn"
-          onClick={() => setShowParticipants((p) => !p)}
-          active={showParticipants}
-          activeColor="#0B5CFF"
-          icon={<Users size={20} color="#fff" />}
-          label={`Participants${participants.length > 0 ? ` (${participants.length})` : ''}`}
-        />
+          {/* Participants */}
+          <ControlButton
+            id="toggle-participants-btn"
+            onClick={() => setShowParticipants((p) => !p)}
+            active={showParticipants}
+            icon={
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Users size={20} color="#fff" />
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-8px',
+                    background: '#555555',
+                    color: '#ffffff',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    padding: '1px 4px',
+                    minWidth: '12px',
+                    textAlign: 'center',
+                    border: '1px solid #000000',
+                  }}
+                >
+                  {participants.length}
+                </span>
+              </div>
+            }
+            label="Participants"
+            hasChevron={true}
+          />
 
-        {/* Chat toggle */}
-        <ControlButton
-          id="chat-btn"
-          onClick={() => setShowChat((c) => !c)}
-          active={showChat}
-          activeColor="#0B5CFF"
-          icon={<MessageSquare size={20} color="#fff" />}
-          label="Chat"
-        />
+          {/* Chat */}
+          <ControlButton
+            id="chat-btn"
+            onClick={() => setShowChat((c) => !c)}
+            active={showChat}
+            icon={<MessageSquare size={20} color="#fff" />}
+            label="Chat"
+            hasChevron={true}
+          />
+        </div>
 
-        {/* Leave / End */}
-        <button
-          id="end-meeting-btn"
-          onClick={handleLeaveOrEnd}
-          title={isHost ? 'End meeting for all' : 'Leave meeting'}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-            border: 'none',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            marginLeft: '12px',
-            boxShadow: '0 4px 12px rgba(220, 38, 38, 0.35)',
-            transition: 'transform 0.15s, opacity 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.04)';
-            e.currentTarget.style.opacity = '0.93';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.opacity = '1';
-          }}
-        >
-          <Phone size={20} color="#fff" style={{ transform: 'rotate(135deg)' }} />
-          <span style={{ color: '#fff', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {isHost ? 'End' : 'Leave'}
-          </span>
-        </button>
+        {/* Right: End / Leave Button */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', paddingRight: '12px' }}>
+          <button
+            id="end-meeting-btn"
+            onClick={handleLeaveOrEnd}
+            title={isHost ? 'End meeting for all' : 'Leave meeting'}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              gap: '4px',
+            }}
+          >
+            <div
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                background: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.15s, transform 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#b91c1c';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#dc2626';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <span style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold', lineHeight: 1 }}>✕</span>
+            </div>
+            <span style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>
+              {isHost ? 'End' : 'Leave'}
+            </span>
+          </button>
+        </div>
       </div>
 
       <style>{`
@@ -1158,7 +1254,12 @@ export default function MeetingRoom() {
 }
 
 // ─── Control Button Component ──────────────────────────────────
-function ControlButton({ id, onClick, active, activeColor, icon, label }) {
+function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevron }) {
+  const isMuteOrVideo = id === 'toggle-mute-btn' || id === 'toggle-video-btn';
+  const bg = active && !isMuteOrVideo 
+    ? 'rgba(255, 255, 255, 0.15)' 
+    : 'transparent';
+
   return (
     <button
       id={id}
@@ -1168,27 +1269,38 @@ function ControlButton({ id, onClick, active, activeColor, icon, label }) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
-        padding: '10px 16px',
-        background: active ? (activeColor || '#374151') : '#374151',
+        justifyContent: 'space-between',
+        padding: '8px 12px',
+        background: bg,
         border: 'none',
-        borderRadius: '12px',
+        borderRadius: '10px',
         cursor: 'pointer',
-        transition: 'background 0.15s, transform 0.15s',
-        minWidth: '64px',
-        boxShadow: active && activeColor ? `0 2px 8px ${activeColor}55` : 'none',
+        transition: 'background 0.15s, transform 0.1s',
+        minWidth: '80px',
+        height: '58px',
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = '#4b5563';
-        e.currentTarget.style.transform = 'scale(1.05)';
+        if (!(active && !isMuteOrVideo)) {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+        }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = active ? (activeColor || '#374151') : '#374151';
+        e.currentTarget.style.background = bg;
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = 'scale(0.96)';
+      }}
+      onMouseUp={(e) => {
         e.currentTarget.style.transform = 'scale(1)';
       }}
     >
-      {icon}
-      <span style={{ color: '#d1d5db', fontSize: '11px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', position: 'relative' }}>
+        {icon}
+        {hasChevron && (
+          <ChevronUp size={11} color="#9ca3af" style={{ marginLeft: '1px', alignSelf: 'center', marginTop: '2px' }} />
+        )}
+      </div>
+      <span style={{ color: '#e5e7eb', fontSize: '11px', fontWeight: 400, whiteSpace: 'nowrap' }}>
         {label}
       </span>
     </button>

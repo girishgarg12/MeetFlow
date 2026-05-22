@@ -8,6 +8,14 @@ import MeetingCard from '@/components/MeetingCard';
 import { listMeetings, deleteMeeting } from '@/lib/api';
 import { Calendar, Video, RefreshCw, AlertTriangle, Info, User, Shield, Hash, Clock, FileText } from 'lucide-react';
 
+const parseUTCDate = (dateStr) => {
+  if (!dateStr) return null;
+  let normalized = dateStr;
+  if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+') && !/-\d{2}:\d{2}$/.test(dateStr)) {
+    normalized = dateStr + 'Z';
+  }
+  return new Date(normalized);
+};
 
 export default function Dashboard() {
   const router = useRouter();
@@ -20,7 +28,7 @@ export default function Dashboard() {
   const formatTime = (dateStr) => {
     if (!dateStr) return 'N/A';
     try {
-      return format(new Date(dateStr), 'EEEE, MMMM d, yyyy · h:mm a');
+      return format(parseUTCDate(dateStr), 'EEEE, MMMM d, yyyy · h:mm a');
     } catch {
       return 'N/A';
     }
@@ -71,11 +79,11 @@ export default function Dashboard() {
   const now = new Date();
 
   const upcomingMeetings = meetings.filter(
-    (m) => m.meeting_type === 'scheduled' && m.is_active && new Date(m.scheduled_at) > now
+    (m) => m.meeting_type === 'scheduled' && m.is_active && parseUTCDate(m.scheduled_at) > now
   );
 
   const recentMeetings = meetings.filter(
-    (m) => !m.is_active || (m.scheduled_at && new Date(m.scheduled_at) < now && m.meeting_type === 'scheduled')
+    (m) => !m.is_active || (m.scheduled_at && parseUTCDate(m.scheduled_at) < now && m.meeting_type === 'scheduled')
   );
 
   return (
@@ -199,6 +207,7 @@ export default function Dashboard() {
                   key={m.id}
                   meeting={m}
                   type="upcoming"
+                  onDelete={initiateDelete}
                   onViewDetails={setSelectedMeetingDetails}
                 />
               ))}
@@ -349,7 +358,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
                 <span>Created At:</span>
                 <span style={{ fontWeight: 500, color: '#374151' }}>
-                  {meetingToDelete.created_at ? new Date(meetingToDelete.created_at).toLocaleDateString('en-US', {
+                  {meetingToDelete.created_at ? parseUTCDate(meetingToDelete.created_at).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric',
@@ -726,7 +735,7 @@ export default function Dashboard() {
               {selectedMeetingDetails.is_active && (
                 <button
                   onClick={() => {
-                    const isUpcoming = selectedMeetingDetails.meeting_type === 'scheduled' && new Date(selectedMeetingDetails.scheduled_at) > new Date();
+                    const isUpcoming = selectedMeetingDetails.meeting_type === 'scheduled' && parseUTCDate(selectedMeetingDetails.scheduled_at) > new Date();
                     if (isUpcoming) {
                       localStorage.setItem('userName', 'Girish');
                       localStorage.setItem('isHost', 'true');
@@ -757,7 +766,7 @@ export default function Dashboard() {
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  {selectedMeetingDetails.meeting_type === 'scheduled' && new Date(selectedMeetingDetails.scheduled_at) > new Date()
+                  {selectedMeetingDetails.meeting_type === 'scheduled' && parseUTCDate(selectedMeetingDetails.scheduled_at) > new Date()
                     ? 'Start Meeting'
                     : 'Join Meeting'}
                 </button>
