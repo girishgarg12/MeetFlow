@@ -554,7 +554,7 @@ export default function MeetingRoom() {
   const getGridStyle = (count) => {
     if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
     if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
-    if (count === 3) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }; // 3rd tile spans
+    if (count === 3) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr' }; // 3 side-by-side
     if (count === 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' };
     if (count <= 6) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' };
     if (count <= 9) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr' };
@@ -818,8 +818,6 @@ export default function MeetingRoom() {
               gap: '10px',
               padding: '12px',
               overflow: 'hidden',
-              // When 3 tiles, let the 3rd span the full bottom row
-              ...(totalTiles === 3 ? { gridTemplateAreas: '"a b" "c c"' } : {}),
             }}
           >
             {/* Local (self) video */}
@@ -830,8 +828,8 @@ export default function MeetingRoom() {
                 overflow: 'hidden',
                 position: 'relative',
                 border: '1px solid #2d2d2d',
-                // 3-tile: take top-left cell
-                ...(totalTiles === 3 ? { gridArea: 'a' } : {}),
+                width: '100%',
+                height: '100%',
               }}
             >
               <video
@@ -922,9 +920,8 @@ export default function MeetingRoom() {
                   overflow: 'hidden',
                   position: 'relative',
                   border: '1px solid #2d2d2d',
-                  // 3-tile: 2nd goes top-right, 3rd spans full bottom
-                  ...(totalTiles === 3 && idx === 0 ? { gridArea: 'b' } : {}),
-                  ...(totalTiles === 3 && idx === 1 ? { gridArea: 'c' } : {}),
+                  width: '100%',
+                  height: '100%',
                 }}
               >
                 <video
