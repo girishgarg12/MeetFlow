@@ -48,6 +48,8 @@ export default function MeetingRoom() {
   const [initDone, setInitDone]                 = useState(false);
   const [showChat, setShowChat]                 = useState(false);
   const [chatMessages, setChatMessages]         = useState([]);
+  const [unreadCount, setUnreadCount]           = useState(0);
+  const showChatRef                             = useRef(false);
   const [newMessageText, setNewMessageText]     = useState('');
 
   const [userName, setUserName] = useState('');
@@ -300,6 +302,10 @@ export default function MeetingRoom() {
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
+        // Increment unread badge only when chat panel is closed
+        if (!showChatRef.current) {
+          setUnreadCount((n) => n + 1);
+        }
       }
 
       // ── Someone left ──
@@ -1315,11 +1321,19 @@ export default function MeetingRoom() {
           {/* Chat */}
           <ControlButton
             id="chat-btn"
-            onClick={() => setShowChat((c) => !c)}
+            onClick={() => {
+              setShowChat((c) => {
+                const next = !c;
+                showChatRef.current = next;
+                if (next) setUnreadCount(0);
+                return next;
+              });
+            }}
             active={showChat}
             icon={<MessageSquare size={20} color="#fff" />}
             label="Chat"
             hasChevron={true}
+            badge={unreadCount}
           />
         </div>
 
@@ -1493,6 +1507,11 @@ export default function MeetingRoom() {
             transform: translateY(0);
           }
         }
+        @keyframes badgePop {
+          0%   { transform: scale(0); opacity: 0; }
+          70%  { transform: scale(1.25); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
         .invite-popup-animation {
           animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
@@ -1502,7 +1521,7 @@ export default function MeetingRoom() {
 }
 
 // ─── Control Button Component ──────────────────────────────────
-function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevron }) {
+function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevron, badge }) {
   const isMuteOrVideo = id === 'toggle-mute-btn' || id === 'toggle-video-btn';
   const bg = active && !isMuteOrVideo 
     ? 'rgba(255, 255, 255, 0.15)' 
@@ -1546,6 +1565,29 @@ function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevr
         {icon}
         {hasChevron && (
           <ChevronUp size={11} color="#9ca3af" style={{ marginLeft: '1px', alignSelf: 'center', marginTop: '2px' }} />
+        )}
+        {!!badge && (
+          <span style={{
+            position: 'absolute',
+            top: '-7px',
+            right: '-7px',
+            background: '#ef4444',
+            color: '#fff',
+            fontSize: '10px',
+            fontWeight: 700,
+            lineHeight: 1,
+            minWidth: '17px',
+            height: '17px',
+            borderRadius: '50px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 4px',
+            boxShadow: '0 0 0 2px #111',
+            animation: 'badgePop 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+          }}>
+            {badge > 99 ? '99+' : badge}
+          </span>
         )}
       </div>
       <span style={{ color: '#e5e7eb', fontSize: '11px', fontWeight: 400, whiteSpace: 'nowrap' }}>
