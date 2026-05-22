@@ -171,7 +171,8 @@ export default function MeetingCard({ meeting, type, onDelete, onViewDetails }) 
             id={`start-btn-${meeting.id}`}
             onClick={(e) => {
               e.stopPropagation();
-              localStorage.setItem('userName', 'Girish');
+              const activeName = (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Girish';
+              localStorage.setItem('userName', activeName);
               localStorage.setItem('isHost', 'true');
               router.push(`/meeting/${meeting.id}`);
             }}

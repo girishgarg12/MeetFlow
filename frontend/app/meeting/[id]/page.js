@@ -7,7 +7,7 @@ import {
   Wifi, WifiOff, Loader2, ChevronUp, Smile,
   MoreHorizontal, LayoutGrid, ShieldCheck
 } from 'lucide-react';
-import { getMeeting, getParticipants, endMeeting, leaveMeeting } from '@/lib/api';
+import { getMeeting, getParticipants, endMeeting, leaveMeeting, joinMeeting } from '@/lib/api';
 
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 
@@ -376,11 +376,48 @@ export default function MeetingRoom() {
       try {
         const meetingRes = await getMeeting(id);
         if (!active) return;
-        setMeeting(meetingRes.data);
+        const meetingData = meetingRes.data;
+        setMeeting(meetingData);
 
         const participantRes = await getParticipants(id);
         if (!active) return;
-        setParticipants(participantRes.data);
+        const currentParticipants = participantRes.data;
+
+        // Check if we need to register this participant in the database
+        const storedParticipantMeetingId = localStorage.getItem('participantMeetingId');
+        if (storedParticipantMeetingId !== id) {
+          const existingParticipant = currentParticipants.find((p) => p.name === storedName);
+          const userIsHost = meetingData.host_name === storedName;
+
+          if (existingParticipant) {
+            localStorage.setItem('participantId', String(existingParticipant.id));
+            localStorage.setItem('participantMeetingId', id);
+            localStorage.setItem('isHost', String(existingParticipant.is_host));
+            setIsHost(existingParticipant.is_host);
+          } else {
+            try {
+              const joinRes = await joinMeeting({
+                meeting_id: id,
+                name: storedName,
+                is_host: userIsHost,
+              });
+              const actualName = joinRes.data.name;
+              localStorage.setItem('userName', actualName);
+              setUserName(actualName);
+              userNameRef.current = actualName;
+
+              localStorage.setItem('participantId', String(joinRes.data.id));
+              localStorage.setItem('participantMeetingId', id);
+              localStorage.setItem('isHost', String(userIsHost));
+              setIsHost(userIsHost);
+              currentParticipants.push(joinRes.data);
+            } catch (joinErr) {
+              console.error('Failed to auto-register participant:', joinErr);
+            }
+          }
+        }
+
+        setParticipants(currentParticipants);
 
         const stream = await startLocalStream();
         if (!active) {

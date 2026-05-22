@@ -31,10 +31,11 @@ export default function ScheduleMeeting() {
     setLoading(true);
     try {
       const scheduledAt = new Date(`${form.date}T${form.time}:00`).toISOString();
+      const activeName = (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Girish';
       await createMeeting({
         title: form.title.trim(),
         description: form.description.trim(),
-        host_name: 'Girish',
+        host_name: activeName,
         meeting_type: 'scheduled',
         scheduled_at: scheduledAt,
         duration: parseInt(form.duration, 10),

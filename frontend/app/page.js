@@ -72,8 +72,31 @@ export default function Dashboard() {
     }
   };
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showDefaultUserToast, setShowDefaultUserToast] = useState(false);
+
   useEffect(() => {
     fetchMeetings();
+    
+    let isGuest = false;
+    let hasSeenToast = false;
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      isGuest = !token;
+      setIsLoggedIn(!!token);
+      hasSeenToast = sessionStorage.getItem('hasSeenDefaultUserToast') === 'true';
+    }
+    
+    if (isGuest && !hasSeenToast) {
+      setShowDefaultUserToast(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('hasSeenDefaultUserToast', 'true');
+      }
+      const timer = setTimeout(() => {
+        setShowDefaultUserToast(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   const now = new Date();
@@ -83,7 +106,7 @@ export default function Dashboard() {
   );
 
   const recentMeetings = meetings.filter(
-    (m) => !m.is_active || (m.scheduled_at && parseUTCDate(m.scheduled_at) < now && m.meeting_type === 'scheduled')
+    (m) => !m.is_active || m.meeting_type === 'instant' || (m.scheduled_at && parseUTCDate(m.scheduled_at) < now)
   );
 
   return (
@@ -91,6 +114,109 @@ export default function Dashboard() {
       <Navbar />
 
       <main style={{ maxWidth: '960px', margin: '0 auto', padding: '32px 24px' }}>
+
+        {/* Default User Warning Pop-up Toast */}
+        {showDefaultUserToast && (
+          <div
+            id="default-user-toast"
+            style={{
+              position: 'fixed',
+              top: '84px',
+              right: '24px',
+              maxWidth: '380px',
+              background: '#ffffff',
+              border: '1px solid #D2D2D5',
+              borderRadius: '8px',
+              padding: '18px 20px',
+              color: '#232333',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '14px',
+              animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#E8F3FF',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0E71EB',
+                flexShrink: 0,
+              }}
+            >
+              <Info size={18} />
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#131619' }}>
+                Default Workspace Active
+              </p>
+              <p style={{ margin: '4px 0 12px 0', fontSize: '13px', color: '#5F5F70', lineHeight: 1.4 }}>
+                This is a default user <strong style={{ color: '#0E71EB', fontWeight: 600 }}>"Girish"</strong> with seeded meetings, for your own workspace signup and login.
+              </p>
+              <button
+                onClick={() => {
+                  setShowDefaultUserToast(false);
+                  router.push('/login');
+                }}
+                style={{
+                  background: '#0E71EB',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0b5cff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0E71EB';
+                }}
+              >
+                Sign Up / Log In
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowDefaultUserToast(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#747487',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f3f4f6';
+                e.currentTarget.style.color = '#131619';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'none';
+                e.currentTarget.style.color = '#747487';
+              }}
+            >
+              <span style={{ fontSize: '14px', fontWeight: 'bold', lineHeight: 1 }}>✕</span>
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <ActionButtons />
@@ -737,7 +863,8 @@ export default function Dashboard() {
                   onClick={() => {
                     const isUpcoming = selectedMeetingDetails.meeting_type === 'scheduled' && parseUTCDate(selectedMeetingDetails.scheduled_at) > new Date();
                     if (isUpcoming) {
-                      localStorage.setItem('userName', 'Girish');
+                      const activeName = (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Girish';
+                      localStorage.setItem('userName', activeName);
                       localStorage.setItem('isHost', 'true');
                       router.push(`/meeting/${selectedMeetingDetails.id}`);
                     } else {
@@ -792,6 +919,10 @@ export default function Dashboard() {
         @keyframes scaleIn {
           from { transform: scale(0.95); opacity: 0; }
           to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
         }
       `}</style>
     </div>

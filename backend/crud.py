@@ -1,4 +1,5 @@
 
+from sqlalchemy import or_
 import config
 import os
 from sqlalchemy.orm import Session
@@ -22,6 +23,7 @@ def create_meeting(db: Session, data: MeetingCreate):
         title        = data.title,
         description  = data.description,
         host_name    = data.host_name,
+        host_id      = data.host_id,
         meeting_type = data.meeting_type,
         scheduled_at = data.scheduled_at,
         duration     = data.duration,
@@ -35,8 +37,23 @@ def create_meeting(db: Session, data: MeetingCreate):
 def get_meeting(db: Session, meeting_id: str):
     return db.query(Meeting).filter(Meeting.id == meeting_id).first()
 
-def get_all_meetings(db: Session):
-    return db.query(Meeting).order_by(Meeting.created_at.desc()).all()
+def get_all_meetings(db: Session, host_name: str = None, user_id: int = None):
+    query = db.query(Meeting)
+    if user_id is not None:
+        query = query.filter(
+            or_(
+                Meeting.host_id == user_id,
+                Meeting.participants.any(Participant.user_id == user_id)
+            )
+        )
+    elif host_name:
+        query = query.filter(
+            or_(
+                Meeting.host_name == host_name,
+                Meeting.participants.any(Participant.name == host_name)
+            )
+        )
+    return query.order_by(Meeting.created_at.desc()).all()
 
 def end_meeting(db: Session, meeting_id: str):
     meeting = get_meeting(db, meeting_id)
@@ -62,6 +79,7 @@ def join_meeting(db: Session, data: ParticipantCreate):
         meeting_id = data.meeting_id,
         name       = data.name,
         is_host    = data.is_host,
+        user_id    = data.user_id,
     )
     db.add(participant)
     db.commit()

@@ -20,20 +20,25 @@ export default function ActionButtons() {
   const handleNewMeeting = async () => {
     if (creating) return;
     setCreating(true);
+    const activeName = (typeof window !== 'undefined' && localStorage.getItem('userName')) || 'Girish';
     try {
       const res = await createMeeting({
         title: 'Meeting Room',
-        host_name: 'Girish',
+        host_name: activeName,
         meeting_type: 'instant',
       });
       // Register host as participant
-      await joinMeeting({
+      const joinRes = await joinMeeting({
         meeting_id: res.data.id,
-        name: 'Girish',
+        name: activeName,
         is_host: true,
       });
-      localStorage.setItem('userName', 'Girish');
-      localStorage.setItem('isHost', 'true');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userName', joinRes.data.name);
+        localStorage.setItem('isHost', 'true');
+        localStorage.setItem('participantId', String(joinRes.data.id));
+        localStorage.setItem('participantMeetingId', res.data.id);
+      }
       router.push(`/meeting/${res.data.id}`);
     } catch (err) {
       alert('Failed to create meeting. Is the backend running at http://localhost:8000?');

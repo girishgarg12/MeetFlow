@@ -5,6 +5,17 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Add interceptor to inject JWT token into all requests automatically if present
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 // ─── MEETING CALLS ────────────────────────────────────────────
 
 export const createMeeting = (data) => api.post('/meetings/', data);
@@ -18,5 +29,11 @@ export const deleteMeeting = (id)   => api.delete(`/meetings/${id}`);
 export const joinMeeting     = (data) => api.post('/participants/', data);
 export const getParticipants = (id)   => api.get(`/participants/${id}`);
 export const leaveMeeting    = (id)   => api.patch(`/participants/${id}/leave`);
+
+// ─── AUTHENTICATION CALLS ─────────────────────────────────────
+
+export const signup = (data) => api.post('/auth/signup', data);
+export const login  = (data) => api.post('/auth/login', data);
+export const getMe  = ()     => api.get('/auth/me');
 
 export default api;

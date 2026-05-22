@@ -1,21 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from database import get_db
 from schemas import MeetingCreate, MeetingOut
-from typing import List
+from typing import List, Optional
 import crud
+from routers.auth import get_current_user_optional
 
 router = APIRouter()
 
 @router.post("/", response_model=MeetingOut)
-def create_meeting(data: MeetingCreate, db: Session = Depends(get_db)):
+def create_meeting(
+    data: MeetingCreate, 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
+):
     """Create a new meeting"""
+    if current_user:
+        data.host_name = current_user.username
+        data.host_id = current_user.id
     return crud.create_meeting(db, data)
 
 @router.get("/", response_model=List[MeetingOut])
-def list_meetings(db: Session = Depends(get_db)):
-    """Get all meetings"""
-    return crud.get_all_meetings(db)
+def list_meetings(db: Session = Depends(get_db), current_user = Depends(get_current_user_optional)):
+    """Get all meetings, filtered by host if authenticated"""
+    host_name = current_user.username if current_user else None
+    user_id = current_user.id if current_user else None
+    return crud.get_all_meetings(db, host_name=host_name, user_id=user_id)
 
 @router.get("/{meeting_id}", response_model=MeetingOut)
 def get_meeting(meeting_id: str, db: Session = Depends(get_db)):

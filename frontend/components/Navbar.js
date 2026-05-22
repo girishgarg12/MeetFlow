@@ -1,7 +1,30 @@
 'use client';
-import { Video, Search, Bell, Settings } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Video, Search, Bell, Settings, LogOut, User } from 'lucide-react';
 
 export default function Navbar() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const name = localStorage.getItem('userName');
+    if (token && name) {
+      setUser({ token, username: name });
+    }
+  }, []);
+
+  const handleSignOut = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('participantId');
+    localStorage.removeItem('participantMeetingId');
+    localStorage.removeItem('isHost');
+    setUser(null);
+    window.location.reload();
+  };
+
   return (
     <nav
       style={{
@@ -68,6 +91,64 @@ export default function Navbar() {
 
       {/* Right: Icons + Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Sign In / Sign Out Button */}
+        {user ? (
+          <button
+            onClick={handleSignOut}
+            title="Sign Out"
+            style={{
+              background: 'none',
+              border: '1.5px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#4b5563',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fef2f2';
+              e.currentTarget.style.borderColor = '#fecaca';
+              e.currentTarget.style.color = '#dc2626';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+              e.currentTarget.style.color = '#4b5563';
+            }}
+          >
+            <LogOut size={13} />
+            <span>Sign Out</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push('/login')}
+            style={{
+              background: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'opacity 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          >
+            <User size={13} />
+            <span>Login / Sign Up</span>
+          </button>
+        )}
+
         <button
           title="Notifications"
           style={{
@@ -104,6 +185,7 @@ export default function Navbar() {
         >
           <Settings size={19} />
         </button>
+        
         <div
           style={{
             width: '36px',
@@ -119,9 +201,9 @@ export default function Navbar() {
             cursor: 'pointer',
             boxShadow: '0 2px 6px rgba(11,92,255,0.3)',
           }}
-          title="Girish"
+          title={user ? user.username : 'Girish (Guest)'}
         >
-          G
+          {user ? user.username.charAt(0).toUpperCase() : 'G'}
         </div>
       </div>
     </nav>

@@ -2,7 +2,7 @@ import config
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import meetings, participants
+from routers import meetings, participants, auth
 from typing import Dict, List
 import json
 
@@ -20,10 +20,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(meetings.router,     prefix="/api/meetings",     tags=["Meetings"])
 app.include_router(participants.router, prefix="/api/participants", tags=["Participants"])
+app.include_router(auth.router,         prefix="/api/auth",         tags=["Auth"])
 
 @app.get("/")
 def root():

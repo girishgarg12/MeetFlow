@@ -10,12 +10,23 @@ function JoinForm() {
 
   const [meetingId, setMeetingId] = useState('');
   const [name, setName] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const id = searchParams.get('id');
     if (id) setMeetingId(id);
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      const activeName = localStorage.getItem('userName');
+      if (token && activeName) {
+        setIsLoggedIn(true);
+        setName(activeName);
+      } else if (activeName) {
+        setName(activeName);
+      }
+    }
   }, [searchParams]);
 
   const handleJoin = async (e) => {
@@ -38,8 +49,9 @@ function JoinForm() {
       });
 
       // Step 3: Save info for meeting room
-      localStorage.setItem('userName', name.trim());
+      localStorage.setItem('userName', res.data.name);
       localStorage.setItem('participantId', String(res.data.id));
+      localStorage.setItem('participantMeetingId', meetingId.trim());
       localStorage.setItem('isHost', 'false');
 
       // Step 4: Enter the meeting room
@@ -156,25 +168,50 @@ function JoinForm() {
 
           {/* Name */}
           <div>
-            <label
-              htmlFor="display-name"
-              style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}
-            >
-              Your Name <span style={{ color: '#ef4444' }}>*</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label
+                htmlFor="display-name"
+                style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}
+              >
+                Your Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              {isLoggedIn && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: '#0B5CFF',
+                    background: '#E8F3FF',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                  }}
+                >
+                  Logged In Account
+                </span>
+              )}
+            </div>
             <input
               id="display-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your display name"
-              style={inputStyle}
+              disabled={isLoggedIn}
+              readOnly={isLoggedIn}
+              style={{
+                ...inputStyle,
+                cursor: isLoggedIn ? 'not-allowed' : 'text',
+                background: isLoggedIn ? '#f3f4f6' : '#fafafa',
+                color: isLoggedIn ? '#6b7280' : '#111827',
+              }}
               onFocus={(e) => {
+                if (isLoggedIn) return;
                 e.target.style.borderColor = '#0B5CFF';
                 e.target.style.boxShadow = '0 0 0 3px rgba(11,92,255,0.1)';
                 e.target.style.background = '#fff';
               }}
               onBlur={(e) => {
+                if (isLoggedIn) return;
                 e.target.style.borderColor = '#e5e7eb';
                 e.target.style.boxShadow = 'none';
               }}
