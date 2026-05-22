@@ -1,4 +1,6 @@
 
+import config
+import os
 from sqlalchemy.orm import Session
 from models import Meeting, Participant
 from schemas import MeetingCreate, ParticipantCreate
@@ -12,7 +14,8 @@ def generate_meeting_id():
 
 def create_meeting(db: Session, data: MeetingCreate):
     meeting_id  = generate_meeting_id()
-    invite_link = f"http://localhost:3000/meeting/{meeting_id}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    invite_link = f"{frontend_url}/meeting/{meeting_id}"
 
     meeting = Meeting(
         id           = meeting_id,
@@ -41,6 +44,16 @@ def end_meeting(db: Session, meeting_id: str):
         meeting.is_active = False
         db.commit()
     return meeting
+
+def delete_meeting(db: Session, meeting_id: str):
+    meeting = get_meeting(db, meeting_id)
+    if not meeting:
+        return None
+    db.query(Participant).filter(Participant.meeting_id == meeting_id).delete()
+    db.delete(meeting)
+    db.commit()
+    return True
+
 
 # Participant Operations
 

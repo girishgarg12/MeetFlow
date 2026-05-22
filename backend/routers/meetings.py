@@ -32,3 +32,11 @@ def end_meeting(meeting_id: str, db: Session = Depends(get_db)):
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return {"message": "Meeting ended", "meeting_id": meeting_id}
+
+@router.delete("/{meeting_id}")
+def delete_meeting(meeting_id: str, db: Session = Depends(get_db)):
+    """Permanently delete a meeting and all its participants from the database"""
+    result = crud.delete_meeting(db, meeting_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"message": "Meeting deleted", "meeting_id": meeting_id}

@@ -1,10 +1,10 @@
 'use client';
 import { format } from 'date-fns';
-import { Clock, Copy, ExternalLink, CheckCircle } from 'lucide-react';
+import { Clock, Copy, ExternalLink, CheckCircle, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export default function MeetingCard({ meeting, type }) {
+export default function MeetingCard({ meeting, type, onDelete }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
 
@@ -117,6 +117,39 @@ export default function MeetingCard({ meeting, type }) {
         >
           {copied ? <CheckCircle size={15} /> : <Copy size={15} />}
         </button>
+
+        {type === 'recent' && onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(meeting.id);
+            }}
+            title="Delete meeting"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              border: 'none',
+              background: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: '#9ca3af',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fef2f2';
+              e.currentTarget.style.color = '#dc2626';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.color = '#9ca3af';
+            }}
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
 
         {isUpcoming && (
           <button

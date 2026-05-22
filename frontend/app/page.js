@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import ActionButtons from '@/components/ActionButtons';
 import MeetingCard from '@/components/MeetingCard';
-import { listMeetings } from '@/lib/api';
-import { Calendar, Video, RefreshCw } from 'lucide-react';
+import { listMeetings, deleteMeeting } from '@/lib/api';
+import { Calendar, Video, RefreshCw, AlertTriangle } from 'lucide-react';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -30,6 +30,30 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const [meetingToDelete, setMeetingToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const initiateDelete = (id) => {
+    const meeting = meetings.find((m) => m.id === id);
+    if (meeting) {
+      setMeetingToDelete(meeting);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!meetingToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteMeeting(meetingToDelete.id);
+      setMeetings((prev) => prev.filter((m) => m.id !== meetingToDelete.id));
+      setMeetingToDelete(null);
+    } catch (err) {
+      alert('Failed to delete meeting: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -238,12 +262,162 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {recentMeetings.map((m) => (
-                <MeetingCard key={m.id} meeting={m} type="recent" />
+                <MeetingCard key={m.id} meeting={m} type="recent" onDelete={initiateDelete} />
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {/* Custom Confirmation Dialog */}
+      {meetingToDelete && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(17, 24, 39, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+          onClick={() => !deleting && setMeetingToDelete(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '440px',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              border: '1px solid #e5e7eb',
+              margin: '0 16px',
+              animation: 'scaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }}>
+              <div
+                style={{
+                  backgroundColor: '#fee2e2',
+                  borderRadius: '50%',
+                  padding: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#dc2626',
+                  flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', margin: 0, marginBottom: '6px' }}>
+                  Delete Meeting
+                </h3>
+                <p style={{ fontSize: '14px', color: '#4b5563', margin: 0, lineHeight: 1.5 }}>
+                  Are you sure you want to permanently delete the meeting <strong style={{ color: '#111827' }}>&ldquo;{meetingToDelete.title}&rdquo;</strong>?
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body Info */}
+            <div
+              style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '24px',
+                border: '1px solid #f3f4f6',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+                <span>Meeting ID:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#374151' }}>{meetingToDelete.id}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280' }}>
+                <span>Created At:</span>
+                <span style={{ fontWeight: 500, color: '#374151' }}>
+                  {meetingToDelete.created_at ? new Date(meetingToDelete.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }) : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                disabled={deleting}
+                onClick={() => setMeetingToDelete(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!deleting) {
+                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                    e.currentTarget.style.borderColor = '#c5c9d1';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!deleting) {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleting}
+                onClick={confirmDelete}
+                style={{
+                  padding: '8px 20px',
+                  background: deleting ? '#fca5a5' : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  transition: 'opacity 0.15s',
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                onMouseEnter={(e) => {
+                  if (!deleting) e.currentTarget.style.opacity = '0.9';
+                }}
+                onMouseLeave={(e) => {
+                  if (!deleting) e.currentTarget.style.opacity = '1';
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes shimmer {
@@ -253,6 +427,14 @@ export default function Dashboard() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
       `}</style>
     </div>
