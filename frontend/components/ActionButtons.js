@@ -47,16 +47,16 @@ export default function ActionButtons() {
     try {
       const res = await createMeeting({
         title: 'My Instant Meeting',
-        host_name: 'Alex Johnson',
+        host_name: 'Girish',
         meeting_type: 'instant',
       });
       // Register host as participant
       await joinMeeting({
         meeting_id: res.data.id,
-        name: 'Alex Johnson',
+        name: 'Girish',
         is_host: true,
       });
-      localStorage.setItem('userName', 'Alex Johnson');
+      localStorage.setItem('userName', 'Girish');
       localStorage.setItem('isHost', 'true');
       router.push(`/meeting/${res.data.id}`);
     } catch (err) {

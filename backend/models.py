@@ -10,7 +10,7 @@ class Meeting(Base):
     id            = Column(String(9), primary_key=True)
     title         = Column(String(255), nullable=False)
     description   = Column(Text, nullable=True)
-    host_name     = Column(String(100), nullable=False, default="Alex Johnson")
+    host_name     = Column(String(100), nullable=False, default="Girish")
 
     meeting_type  = Column(String(20), default="instant")
 

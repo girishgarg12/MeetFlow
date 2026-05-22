@@ -119,9 +119,9 @@ export default function Navbar() {
             cursor: 'pointer',
             boxShadow: '0 2px 6px rgba(11,92,255,0.3)',
           }}
-          title="Alex Johnson"
+          title="Girish"
         >
-          AJ
+          G
         </div>
       </div>
     </nav>

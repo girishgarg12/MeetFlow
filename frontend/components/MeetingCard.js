@@ -4,9 +4,10 @@ import { Clock, Copy, ExternalLink, CheckCircle, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export default function MeetingCard({ meeting, type, onDelete }) {
+export default function MeetingCard({ meeting, type, onDelete, onViewDetails }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [isCardHovered, setIsCardHovered] = useState(false);
 
   const copyLink = (e) => {
     e.stopPropagation();
@@ -29,6 +30,8 @@ export default function MeetingCard({ meeting, type, onDelete }) {
 
   return (
     <div
+      onClick={() => onViewDetails && onViewDetails(meeting)}
+      title="View details"
       style={{
         background: '#ffffff',
         borderRadius: '14px',
@@ -39,15 +42,17 @@ export default function MeetingCard({ meeting, type, onDelete }) {
         justifyContent: 'space-between',
         gap: '16px',
         transition: 'box-shadow 0.18s ease, transform 0.18s ease',
-        cursor: 'default',
+        cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
         e.currentTarget.style.transform = 'translateY(-1px)';
+        setIsCardHovered(true);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = 'none';
         e.currentTarget.style.transform = 'translateY(0)';
+        setIsCardHovered(false);
       }}
     >
       {/* Left: Color dot + text */}
@@ -68,11 +73,12 @@ export default function MeetingCard({ meeting, type, onDelete }) {
             style={{
               fontSize: '14px',
               fontWeight: 600,
-              color: '#111827',
+              color: isCardHovered ? '#0B5CFF' : '#111827',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               marginBottom: '4px',
+              transition: 'color 0.15s ease',
             }}
           >
             {meeting.title}
@@ -154,8 +160,9 @@ export default function MeetingCard({ meeting, type, onDelete }) {
         {isUpcoming && (
           <button
             id={`start-btn-${meeting.id}`}
-            onClick={() => {
-              localStorage.setItem('userName', 'Alex Johnson');
+            onClick={(e) => {
+              e.stopPropagation();
+              localStorage.setItem('userName', 'Girish');
               localStorage.setItem('isHost', 'true');
               router.push(`/meeting/${meeting.id}`);
             }}
@@ -187,7 +194,10 @@ export default function MeetingCard({ meeting, type, onDelete }) {
         {type === 'recent' && (
           <button
             id={`rejoin-btn-${meeting.id}`}
-            onClick={() => router.push(`/join?id=${meeting.id}`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/join?id=${meeting.id}`);
+            }}
             style={{
               padding: '6px 14px',
               background: 'none',

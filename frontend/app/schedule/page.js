@@ -34,7 +34,7 @@ export default function ScheduleMeeting() {
       await createMeeting({
         title: form.title.trim(),
         description: form.description.trim(),
-        host_name: 'Alex Johnson',
+        host_name: 'Girish',
         meeting_type: 'scheduled',
         scheduled_at: scheduledAt,
         duration: parseInt(form.duration, 10),

@@ -15,7 +15,7 @@ meetings = [
         id="ABC123DEF",
         title="Team Daily Standup",
         description="Quick 15-min sync to align on today's priorities",
-        host_name="Alex Johnson",
+        host_name="Girish",
         meeting_type="scheduled",
         scheduled_at=datetime.utcnow() + timedelta(hours=2),
         duration=30,
@@ -26,7 +26,7 @@ meetings = [
         id="XYZ789GHI",
         title="Product Roadmap Review",
         description="Q2 planning session with product and engineering",
-        host_name="Alex Johnson",
+        host_name="Girish",
         meeting_type="scheduled",
         scheduled_at=datetime.utcnow() + timedelta(days=1),
         duration=60,
@@ -36,7 +36,7 @@ meetings = [
     Meeting(
         id="MNO456PQR",
         title="Design System Workshop",
-        host_name="Alex Johnson",
+        host_name="Girish",
         meeting_type="scheduled",
         scheduled_at=datetime.utcnow() + timedelta(days=3),
         duration=90,
@@ -48,7 +48,7 @@ meetings = [
         id="DEF456JKL",
         title="Sprint Retrospective",
         description="End of sprint reflection meeting",
-        host_name="Alex Johnson",
+        host_name="Girish",
         meeting_type="instant",
         scheduled_at=datetime.utcnow() - timedelta(hours=3),
         duration=45,
@@ -58,7 +58,7 @@ meetings = [
     Meeting(
         id="STU123VWX",
         title="Client Demo - Project Alpha",
-        host_name="Alex Johnson",
+        host_name="Girish",
         meeting_type="instant",
         scheduled_at=datetime.utcnow() - timedelta(days=1),
         duration=60,
@@ -74,10 +74,10 @@ db.commit()
 # SAMPLE PARTICIPANTS
 
 participants = [
-    Participant(meeting_id="DEF456JKL", name="Alex Johnson", is_host=True),
+    Participant(meeting_id="DEF456JKL", name="Girish", is_host=True),
     Participant(meeting_id="DEF456JKL", name="Sarah Chen"),
     Participant(meeting_id="DEF456JKL", name="Mike Wilson"),
-    Participant(meeting_id="STU123VWX", name="Alex Johnson", is_host=True),
+    Participant(meeting_id="STU123VWX", name="Girish", is_host=True),
     Participant(meeting_id="STU123VWX", name="Client Representative"),
 ]
 
