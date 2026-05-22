@@ -43,8 +43,8 @@ export default function MeetingRoom() {
   const iceCandidateQueue = useRef({}); // { userName: [RTCIceCandidateInit, ...] }
   // Per-peer negotiation lock — prevents duplicate offer/answer while one is in flight
   const negotiatingRef    = useRef({}); // { userName: boolean }
-  // Guards against React Strict Mode double-invoking the effect
-  const initializedRef    = useRef(false);
+  // Stores remote MediaStreams so they can be re-attached after React re-renders the video elements
+  const remoteStreamsRef  = useRef({}); // { userName: MediaStream }
 
   // ─── WEBRTC CONFIG ─────────────────────────────────────────
   const RTC_CONFIG = {
@@ -91,12 +91,21 @@ export default function MeetingRoom() {
         });
       }
 
-      // On remote stream → attach to video element
+      // On remote stream → store it, then attach to video element if already in DOM
       pc.ontrack = (event) => {
+        if (!event.streams[0]) return;
+        const stream = event.streams[0];
+        // Always persist the stream so we can reattach if the element hasn't rendered yet
+        remoteStreamsRef.current[targetUser] = stream;
         const remoteVideo = document.getElementById(`video-${targetUser}`);
-        if (remoteVideo && event.streams[0]) {
-          remoteVideo.srcObject = event.streams[0];
+        if (remoteVideo) {
+          remoteVideo.srcObject = stream;
         }
+        // Trigger re-render so the useEffect below can catch and attach if element wasn't ready
+        setParticipants((prev) => {
+          if (prev.find((p) => p.name === targetUser)) return prev;
+          return [...prev, { name: targetUser, is_host: false }];
+        });
       };
 
       // Send ICE candidates via WebSocket
@@ -133,6 +142,30 @@ export default function MeetingRoom() {
       }
     }
   }, []);
+
+  // ─── REATTACH REMOTE STREAMS AFTER REACT RE-RENDERS ───────────
+  // When participants list changes, React may create new video elements.
+  // If ontrack already fired before the element existed, reattach from the stored ref.
+  useEffect(() => {
+    Object.entries(remoteStreamsRef.current).forEach(([peerName, stream]) => {
+      const el = document.getElementById(`video-${peerName}`);
+      if (el && el.srcObject !== stream) {
+        el.srcObject = stream;
+      }
+    });
+  }, [participants]); // runs every time participants list changes
+
+  // ─── ATTACH LOCAL STREAM ONCE MEETING UI IS VISIBLE ─────────
+  // startLocalStream runs BEFORE initDone=true renders the video element,
+  // so localVideoRef.current is null at that point. This effect fires after
+  // the video element mounts and ensures srcObject is always attached.
+  useEffect(() => {
+    if (initDone && localStream.current && localVideoRef.current) {
+      if (localVideoRef.current.srcObject !== localStream.current) {
+        localVideoRef.current.srcObject = localStream.current;
+      }
+    }
+  }, [initDone]);
 
   // ─── 3. WEBSOCKET + SIGNALING ────────────────────────────
   const connectWebSocket = useCallback(() => {
@@ -247,9 +280,12 @@ export default function MeetingRoom() {
 
   // ─── 4. INITIALIZE ────────────────────────────────────────
   useEffect(() => {
-    // Prevent React Strict Mode from running init twice in dev
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    // If user has no name (e.g. opened link directly in incognito), redirect to /join
+    const storedName = localStorage.getItem('userName');
+    if (!storedName) {
+      router.push(`/join?id=${id}`);
+      return;
+    }
 
     const init = async () => {
       try {
@@ -276,12 +312,14 @@ export default function MeetingRoom() {
 
     init();
 
+    // Cleanup: stop all tracks, close WS, close all peer connections
     return () => {
-      initializedRef.current = false;
       if (localStream.current) {
         localStream.current.getTracks().forEach((t) => t.stop());
+        localStream.current = null;
       }
       if (wsRef.current) {
+        wsRef.current.onclose = null; // suppress the status update on intentional close
         wsRef.current.close();
         wsRef.current = null;
       }
@@ -351,6 +389,20 @@ export default function MeetingRoom() {
 
   // Remote participants (excluding self)
   const remoteParticipants = participants.filter((p) => p.name !== userName);
+
+  // ─── RESPONSIVE GRID LAYOUT ────────────────────────────────
+  // Returns CSS grid template based on total tile count
+  const totalTiles = remoteParticipants.length + 1; // +1 for self
+  const getGridStyle = (count) => {
+    if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
+    if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
+    if (count === 3) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }; // 3rd tile spans
+    if (count === 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' };
+    if (count <= 6) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' };
+    if (count <= 9) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr' };
+    return { gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto' };
+  };
+  const gridLayout = getGridStyle(totalTiles);
 
   // ─── RENDER ───────────────────────────────────────────────
 
@@ -487,7 +539,7 @@ export default function MeetingRoom() {
       {/* ── MAIN CONTENT ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* ── VIDEO AREA ── */}
-        <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'auto' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Camera error notice */}
           {cameraError && (
             <div
@@ -495,12 +547,14 @@ export default function MeetingRoom() {
                 background: '#422006',
                 border: '1px solid #78350f',
                 borderRadius: '10px',
-                padding: '12px 16px',
+                padding: '10px 16px',
+                margin: '12px 12px 0',
                 color: '#fbbf24',
                 fontSize: '13px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
+                flexShrink: 0,
               }}
             >
               <WifiOff size={15} />
@@ -508,14 +562,17 @@ export default function MeetingRoom() {
             </div>
           )}
 
-          {/* Video Grid */}
+          {/* Video Grid — fills all remaining height */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: remoteParticipants.length === 0 ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '12px',
               flex: 1,
-              alignContent: 'start',
+              display: 'grid',
+              ...gridLayout,
+              gap: '10px',
+              padding: '12px',
+              overflow: 'hidden',
+              // When 3 tiles, let the 3rd span the full bottom row
+              ...(totalTiles === 3 ? { gridTemplateAreas: '"a b" "c c"' } : {}),
             }}
           >
             {/* Local (self) video */}
@@ -525,12 +582,22 @@ export default function MeetingRoom() {
                 borderRadius: '14px',
                 overflow: 'hidden',
                 position: 'relative',
-                minHeight: '240px',
                 border: '2px solid #374151',
+                // When alone, add a subtle inner glow
+                boxShadow: totalTiles === 1 ? '0 0 0 1px #374151 inset' : 'none',
+                // 3-tile: take top-left cell
+                ...(totalTiles === 3 ? { gridArea: 'a' } : {}),
               }}
             >
               <video
-                ref={localVideoRef}
+                ref={(el) => {
+                  // ref callback: fires when element mounts/unmounts
+                  localVideoRef.current = el;
+                  // Immediately attach stream if already acquired (handles post-initDone mount)
+                  if (el && localStream.current) {
+                    el.srcObject = localStream.current;
+                  }
+                }}
                 autoPlay
                 muted
                 playsInline
@@ -539,9 +606,13 @@ export default function MeetingRoom() {
                   height: '100%',
                   objectFit: 'cover',
                   display: isVideoOff ? 'none' : 'block',
-                  minHeight: '240px',
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 1,
                 }}
               />
+              {/* Height anchor: keeps the tile in the grid when video is off */}
+              <div style={{ width: '100%', height: '100%', minHeight: '200px' }} />
               {(isVideoOff || cameraError) && (
                 <div
                   style={{
@@ -588,6 +659,7 @@ export default function MeetingRoom() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
+                  zIndex: 2,
                 }}
               >
                 {isMuted && <MicOff size={11} color="#f87171" />}
@@ -596,7 +668,7 @@ export default function MeetingRoom() {
             </div>
 
             {/* Remote participants' videos */}
-            {remoteParticipants.map((participant) => (
+            {remoteParticipants.map((participant, idx) => (
               <div
                 key={participant.name}
                 style={{
@@ -604,8 +676,10 @@ export default function MeetingRoom() {
                   borderRadius: '14px',
                   overflow: 'hidden',
                   position: 'relative',
-                  minHeight: '240px',
                   border: '2px solid #374151',
+                  // 3-tile: 2nd goes top-right, 3rd spans full bottom
+                  ...(totalTiles === 3 && idx === 0 ? { gridArea: 'b' } : {}),
+                  ...(totalTiles === 3 && idx === 1 ? { gridArea: 'c' } : {}),
                 }}
               >
                 <video
@@ -616,9 +690,13 @@ export default function MeetingRoom() {
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    minHeight: '240px',
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 2, // must be above the avatar (zIndex:0) so video is visible
                   }}
                 />
+                {/* Invisible height placeholder */}
+                <div style={{ height: '100%' }} />
                 {/* Fallback avatar */}
                 <div
                   style={{
@@ -662,7 +740,7 @@ export default function MeetingRoom() {
                     fontWeight: 500,
                     padding: '4px 10px',
                     borderRadius: '100px',
-                    zIndex: 1,
+                    zIndex: 3, // above video (2) and avatar (0)
                   }}
                 >
                   {participant.name}
