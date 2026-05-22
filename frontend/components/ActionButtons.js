@@ -1,5 +1,5 @@
 'use client';
-import { Video, Plus, Calendar, Monitor } from 'lucide-react';
+import { Video, Plus, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createMeeting, joinMeeting } from '@/lib/api';
 import { useState } from 'react';
@@ -35,16 +35,6 @@ const actions = [
     iconBg: 'linear-gradient(135deg, #6366f1, #4f46e5)',
     shadowColor: 'rgba(99, 102, 241, 0.22)',
   },
-  {
-    key: 'share',
-    label: 'Share Screen',
-    icon: Monitor,
-    bg: 'linear-gradient(135deg, #10b981, #059669)',
-    cardBg: '#ecfdf5',
-    cardBorder: '#a7f3d0',
-    iconBg: 'linear-gradient(135deg, #10b981, #059669)',
-    shadowColor: 'rgba(16, 185, 129, 0.22)',
-  },
 ];
 
 export default function ActionButtons() {
@@ -79,18 +69,17 @@ export default function ActionButtons() {
     if (key === 'new') handleNewMeeting();
     else if (key === 'join') router.push('/join');
     else if (key === 'schedule') router.push('/schedule');
-    else if (key === 'share') alert('Screen sharing is available inside a meeting room.');
   };
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '16px',
         marginBottom: '32px',
       }}
-      className="grid-cols-2 md:grid-cols-4"
+      className="grid-cols-1 sm:grid-cols-3"
     >
       {actions.map(({ key, label, icon: Icon, cardBg, cardBorder, iconBg, shadowColor }) => (
         <button

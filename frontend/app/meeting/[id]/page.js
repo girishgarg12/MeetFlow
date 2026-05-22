@@ -24,15 +24,13 @@ export default function MeetingRoom() {
   const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting | connected | error | disconnected
   const [cameraError, setCameraError]           = useState(false);
   const [initDone, setInitDone]                 = useState(false);
+  const [showChat, setShowChat]                 = useState(false);
+  const [chatMessages, setChatMessages]         = useState([]);
+  const [newMessageText, setNewMessageText]     = useState('');
 
-  const [userName] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('userName') || 'Guest';
-    return 'Guest';
-  });
-  const [isHost] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('isHost') === 'true';
-    return false;
-  });
+  const [userName, setUserName] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  const userNameRef = useRef('');
 
   // ─── REFS ─────────────────────────────────────────────────
   const localVideoRef     = useRef(null);
@@ -116,7 +114,7 @@ export default function MeetingRoom() {
               type: 'ice-candidate',
               candidate: event.candidate,
               target: targetUser,
-              from: userName,
+              from: userNameRef.current,
             })
           );
         }
@@ -125,7 +123,7 @@ export default function MeetingRoom() {
       peersRef.current[targetUser] = pc;
       return pc;
     },
-    [userName] // eslint-disable-line react-hooks/exhaustive-deps
+    [] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // ─── FLUSH QUEUED ICE CANDIDATES ─────────────────────────
@@ -168,8 +166,17 @@ export default function MeetingRoom() {
   }, [initDone]);
 
   // ─── 3. WEBSOCKET + SIGNALING ────────────────────────────
-  const connectWebSocket = useCallback(() => {
-    const ws = new WebSocket(`${WS_BASE}/ws/${id}/${encodeURIComponent(userName)}`);
+  const connectWebSocket = useCallback((nameToUse) => {
+    // Guard against duplicate connection attempts
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      console.log('WebSocket connection already active or connecting');
+      return;
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    const ws = new WebSocket(`${WS_BASE}/ws/${id}/${encodeURIComponent(nameToUse)}`);
     wsRef.current = ws;
 
     ws.onopen = () => setConnectionStatus('connected');
@@ -183,7 +190,7 @@ export default function MeetingRoom() {
       }
 
       // ── Someone new joined → we are the offerer ──
-      if (message.type === 'user_joined' && message.user !== userName) {
+      if (message.type === 'user_joined' && message.user !== nameToUse) {
         // Guard: skip if already negotiating with this user
         if (negotiatingRef.current[message.user]) return;
         negotiatingRef.current[message.user] = true;
@@ -192,7 +199,7 @@ export default function MeetingRoom() {
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          ws.send(JSON.stringify({ type: 'offer', offer, target: message.user, from: userName }));
+          ws.send(JSON.stringify({ type: 'offer', offer, target: message.user, from: nameToUse }));
         } catch (e) {
           console.error('Error creating offer:', e);
           negotiatingRef.current[message.user] = false;
@@ -204,7 +211,7 @@ export default function MeetingRoom() {
       }
 
       // ── Received an offer → we are the answerer ──
-      else if (message.type === 'offer' && message.target === userName) {
+      else if (message.type === 'offer' && message.target === nameToUse) {
         const pc = createPeerConnection(message.from);
         try {
           // Only accept offer when in correct state
@@ -213,7 +220,7 @@ export default function MeetingRoom() {
             await flushIceCandidates(message.from); // apply any queued candidates
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            ws.send(JSON.stringify({ type: 'answer', answer, target: message.from, from: userName }));
+            ws.send(JSON.stringify({ type: 'answer', answer, target: message.from, from: nameToUse }));
           }
         } catch (e) {
           console.error('Error handling offer:', e);
@@ -225,7 +232,7 @@ export default function MeetingRoom() {
       }
 
       // ── Received an answer → complete the handshake ──
-      else if (message.type === 'answer' && message.target === userName) {
+      else if (message.type === 'answer' && message.target === nameToUse) {
         const pc = peersRef.current[message.from];
         // Only apply answer when we are waiting for one (have-local-offer state)
         if (pc && pc.signalingState === 'have-local-offer') {
@@ -238,11 +245,10 @@ export default function MeetingRoom() {
             negotiatingRef.current[message.from] = false;
           }
         }
-        // Silently ignore: answer arrived but we're already stable (duplicate broadcast)
       }
 
       // ── ICE candidate ──
-      else if (message.type === 'ice-candidate' && message.target === userName) {
+      else if (message.type === 'ice-candidate' && message.target === nameToUse) {
         const pc = peersRef.current[message.from];
         if (!pc) return;
 
@@ -262,6 +268,18 @@ export default function MeetingRoom() {
         }
       }
 
+      // ── Received a chat message ──
+      else if (message.type === 'chat') {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            sender: message.sender,
+            text: message.text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }
+
       // ── Someone left ──
       else if (message.type === 'user_left') {
         setParticipants((prev) => prev.filter((p) => p.name !== message.user));
@@ -276,29 +294,63 @@ export default function MeetingRoom() {
 
     ws.onerror = () => setConnectionStatus('error');
     ws.onclose = () => setConnectionStatus('disconnected');
-  }, [id, userName, createPeerConnection, flushIceCandidates]);
+  }, [id, createPeerConnection, flushIceCandidates]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    const container = document.getElementById('chat-messages-container');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const sendChatMessage = (e) => {
+    if (e) e.preventDefault();
+    if (!newMessageText.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    const msg = {
+      type: 'chat',
+      sender: userNameRef.current,
+      text: newMessageText.trim()
+    };
+    wsRef.current.send(JSON.stringify(msg));
+    setNewMessageText('');
+  };
 
   // ─── 4. INITIALIZE ────────────────────────────────────────
   useEffect(() => {
-    // If user has no name (e.g. opened link directly in incognito), redirect to /join
     const storedName = localStorage.getItem('userName');
+    const storedIsHost = localStorage.getItem('isHost') === 'true';
     if (!storedName) {
       router.push(`/join?id=${id}`);
       return;
     }
+    setUserName(storedName);
+    userNameRef.current = storedName;
+    setIsHost(storedIsHost);
+
+    let active = true;
 
     const init = async () => {
       try {
         const meetingRes = await getMeeting(id);
+        if (!active) return;
         setMeeting(meetingRes.data);
 
         const participantRes = await getParticipants(id);
+        if (!active) return;
         setParticipants(participantRes.data);
 
-        await startLocalStream();
-        connectWebSocket();
+        const stream = await startLocalStream();
+        if (!active) {
+          if (stream) stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        connectWebSocket(storedName);
         setInitDone(true);
       } catch (err) {
+        if (!active) return;
         if (err.response?.status === 404) {
           alert('Meeting not found!');
           router.push('/join');
@@ -314,6 +366,7 @@ export default function MeetingRoom() {
 
     // Cleanup: stop all tracks, close WS, close all peer connections
     return () => {
+      active = false;
       if (localStream.current) {
         localStream.current.getTracks().forEach((t) => t.stop());
         localStream.current = null;
@@ -840,6 +893,162 @@ export default function MeetingRoom() {
             </div>
           </div>
         )}
+
+        {/* ── CHAT SIDEBAR ── */}
+        {showChat && (
+          <div
+            style={{
+              width: '320px',
+              background: '#1f2937',
+              borderLeft: '1px solid #374151',
+              display: 'flex',
+              flexDirection: 'column',
+              flexShrink: 0,
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px',
+                borderBottom: '1px solid #374151',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={15} color="#9ca3af" />
+                <span style={{ color: '#f9fafb', fontWeight: 600, fontSize: '14px' }}>
+                  In-call Messages
+                </span>
+              </div>
+              <button
+                onClick={() => setShowChat(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Messages list */}
+            <div
+              id="chat-messages-container"
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              {chatMessages.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af', fontSize: '12px', lineHeight: 1.5 }}>
+                  Messages can only be seen by people in the call, and are deleted when the call ends.
+                </div>
+              ) : (
+                chatMessages.map((msg, index) => {
+                  const isOwn = msg.sender === userName;
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isOwn ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          color: '#9ca3af',
+                          marginBottom: '2px',
+                          paddingLeft: '4px',
+                          paddingRight: '4px',
+                        }}
+                      >
+                        {isOwn ? 'You' : msg.sender} • {msg.time}
+                      </span>
+                      <div
+                        style={{
+                          backgroundColor: isOwn ? '#0B5CFF' : '#374151',
+                          color: '#ffffff',
+                          borderRadius: '12px',
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          lineHeight: 1.4,
+                          wordBreak: 'break-word',
+                          borderTopRightRadius: isOwn ? '2px' : '12px',
+                          borderTopLeftRadius: isOwn ? '12px' : '2px',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input form */}
+            <form
+              onSubmit={sendChatMessage}
+              style={{
+                padding: '12px 16px',
+                borderTop: '1px solid #374151',
+                display: 'flex',
+                gap: '8px',
+                background: '#111827',
+              }}
+            >
+              <input
+                type="text"
+                value={newMessageText}
+                onChange={(e) => setNewMessageText(e.target.value)}
+                placeholder="Send a message..."
+                style={{
+                  flex: 1,
+                  background: '#1f2937',
+                  border: '1px solid #374151',
+                  borderRadius: '20px',
+                  padding: '8px 16px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  background: '#0B5CFF',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+              >
+                ➤
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* ── CONTROL BAR ── */}
@@ -893,10 +1102,12 @@ export default function MeetingRoom() {
           label={`Participants${participants.length > 0 ? ` (${participants.length})` : ''}`}
         />
 
-        {/* Chat (placeholder) */}
+        {/* Chat toggle */}
         <ControlButton
           id="chat-btn"
-          onClick={() => {}}
+          onClick={() => setShowChat((c) => !c)}
+          active={showChat}
+          activeColor="#0B5CFF"
           icon={<MessageSquare size={20} color="#fff" />}
           label="Chat"
         />
