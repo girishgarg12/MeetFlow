@@ -1,45 +1,21 @@
 'use client';
-import { Video, Plus, Calendar } from 'lucide-react';
+import { Video, Plus, Calendar, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createMeeting, joinMeeting } from '@/lib/api';
-import { useState } from 'react';
-
-const actions = [
-  {
-    key: 'new',
-    label: 'New Meeting',
-    icon: Video,
-    bg: 'linear-gradient(135deg, #ff6b35, #f7931e)',
-    cardBg: '#fff7f3',
-    cardBorder: '#fed7aa',
-    iconBg: 'linear-gradient(135deg, #ff6b35, #f7931e)',
-    shadowColor: 'rgba(255, 107, 53, 0.25)',
-  },
-  {
-    key: 'join',
-    label: 'Join Meeting',
-    icon: Plus,
-    bg: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
-    cardBg: '#f0f4ff',
-    cardBorder: '#bfdbfe',
-    iconBg: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
-    shadowColor: 'rgba(11, 92, 255, 0.22)',
-  },
-  {
-    key: 'schedule',
-    label: 'Schedule',
-    icon: Calendar,
-    bg: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-    cardBg: '#f5f3ff',
-    cardBorder: '#c4b5fd',
-    iconBg: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-    shadowColor: 'rgba(99, 102, 241, 0.22)',
-  },
-];
+import { useState, useEffect } from 'react';
 
 export default function ActionButtons() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [time, setTime] = useState(null);
+
+  useEffect(() => {
+    setTime(new Date());
+    const interval = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleNewMeeting = async () => {
     if (creating) return;
@@ -65,75 +41,194 @@ export default function ActionButtons() {
     }
   };
 
-  const handleClick = (key) => {
-    if (key === 'new') handleNewMeeting();
-    else if (key === 'join') router.push('/join');
-    else if (key === 'schedule') router.push('/schedule');
-  };
+  const timeString = time
+    ? time.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : '';
+
+  const dateString = time
+    ? time.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      })
+    : '';
+
+  // Button interactive states
+  const [hoveredBtn, setHoveredBtn] = useState(null);
 
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '16px',
-        marginBottom: '32px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginBottom: '40px',
+        background: '#ffffff',
+        borderRadius: '16px',
+        border: '1px solid #e5e7eb',
+        padding: '32px 24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
       }}
-      className="grid-cols-1 sm:grid-cols-3"
     >
-      {actions.map(({ key, label, icon: Icon, cardBg, cardBorder, iconBg, shadowColor }) => (
-        <button
-          key={key}
-          id={`action-btn-${key}`}
-          onClick={() => handleClick(key)}
-          disabled={key === 'new' && creating}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-            backgroundColor: cardBg,
-            border: `1px solid ${cardBorder}`,
-            borderRadius: '18px',
-            padding: '24px 16px',
-            cursor: 'pointer',
-            transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-            boxShadow: `0 2px 8px ${shadowColor}`,
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-3px)';
-            e.currentTarget.style.boxShadow = `0 8px 24px ${shadowColor}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = `0 2px 8px ${shadowColor}`;
-          }}
-        >
-          <div
+      {/* Clock and Date */}
+      <div
+        style={{
+          height: '76px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '28px',
+        }}
+      >
+        {time ? (
+          <>
+            <h1
+              style={{
+                fontSize: '40px',
+                fontWeight: 500,
+                color: '#1a1a2e',
+                margin: 0,
+                letterSpacing: '-0.5px',
+              }}
+            >
+              {timeString}
+            </h1>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#5b5b66',
+                margin: '4px 0 0 0',
+                fontWeight: 500,
+              }}
+            >
+              {dateString}
+            </p>
+          </>
+        ) : (
+          <div style={{ height: '76px' }} />
+        )}
+      </div>
+
+      {/* Action Buttons Row */}
+      <div style={{ display: 'flex', gap: '48px', justifyContent: 'center' }}>
+        {/* New Meeting */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={handleNewMeeting}
+            disabled={creating}
+            onMouseEnter={() => setHoveredBtn('new')}
+            onMouseLeave={() => setHoveredBtn(null)}
             style={{
-              background: iconBg,
-              borderRadius: '50%',
-              width: '52px',
-              height: '52px',
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: creating
+                ? '#e5e7eb'
+                : hoveredBtn === 'new'
+                ? '#e0591b'
+                : '#FF742E',
+              color: '#ffffff',
+              border: 'none',
+              cursor: creating ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: `0 4px 12px ${shadowColor}`,
+              transition: 'background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease',
+              transform: hoveredBtn === 'new' ? 'scale(1.04)' : 'scale(1)',
+              boxShadow: hoveredBtn === 'new' ? '0 6px 16px rgba(255, 116, 46, 0.25)' : 'none',
             }}
           >
-            {key === 'new' && creating ? (
+            {creating ? (
               <span style={{ color: '#fff', fontSize: '11px', fontWeight: 600 }}>...</span>
             ) : (
-              <Icon size={22} color="#fff" strokeWidth={2.2} />
+              <Video size={28} strokeWidth={2} />
             )}
+          </button>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              cursor: 'pointer',
+            }}
+            onClick={handleNewMeeting}
+          >
+            <span style={{ fontSize: '12px', fontWeight: 500, color: '#5b5b66' }}>
+              {creating ? 'Creating...' : 'New meeting'}
+            </span>
+            <ChevronDown size={12} color="#5b5b66" style={{ marginTop: '1px' }} />
           </div>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#232333' }}>
-            {key === 'new' && creating ? 'Creating...' : label}
+        </div>
+
+        {/* Join Meeting */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => router.push('/join')}
+            onMouseEnter={() => setHoveredBtn('join')}
+            onMouseLeave={() => setHoveredBtn(null)}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: hoveredBtn === 'join' ? '#0047cc' : '#0B5CFF',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease',
+              transform: hoveredBtn === 'join' ? 'scale(1.04)' : 'scale(1)',
+              boxShadow: hoveredBtn === 'join' ? '0 6px 16px rgba(11, 92, 255, 0.25)' : 'none',
+            }}
+          >
+            <Plus size={28} strokeWidth={2.2} />
+          </button>
+          <span
+            onClick={() => router.push('/join')}
+            style={{ fontSize: '12px', fontWeight: 500, color: '#5b5b66', cursor: 'pointer' }}
+          >
+            Join
           </span>
-        </button>
-      ))}
+        </div>
+
+        {/* Schedule */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => router.push('/schedule')}
+            onMouseEnter={() => setHoveredBtn('schedule')}
+            onMouseLeave={() => setHoveredBtn(null)}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: hoveredBtn === 'schedule' ? '#0047cc' : '#0B5CFF',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease',
+              transform: hoveredBtn === 'schedule' ? 'scale(1.04)' : 'scale(1)',
+              boxShadow: hoveredBtn === 'schedule' ? '0 6px 16px rgba(11, 92, 255, 0.25)' : 'none',
+            }}
+          >
+            <Calendar size={26} strokeWidth={2} />
+          </button>
+          <span
+            onClick={() => router.push('/schedule')}
+            style={{ fontSize: '12px', fontWeight: 500, color: '#5b5b66', cursor: 'pointer' }}
+          >
+            Schedule
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

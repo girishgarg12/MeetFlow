@@ -8,12 +8,6 @@ import MeetingCard from '@/components/MeetingCard';
 import { listMeetings, deleteMeeting } from '@/lib/api';
 import { Calendar, Video, RefreshCw, AlertTriangle, Info, User, Shield, Hash, Clock, FileText } from 'lucide-react';
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -89,20 +83,6 @@ export default function Dashboard() {
       <Navbar />
 
       <main style={{ maxWidth: '960px', margin: '0 auto', padding: '32px 24px' }}>
-        {/* Greeting */}
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
-            {getGreeting()}, Girish 👋
-          </h1>
-          <p style={{ fontSize: '14px', color: '#6b7280' }}>
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
-        </div>
 
         {/* Action Buttons */}
         <ActionButtons />
