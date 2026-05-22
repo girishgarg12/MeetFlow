@@ -41,6 +41,8 @@ export default function MeetingRoom() {
   const [copiedId, setCopiedId]                 = useState(false);
   const [copiedLink, setCopiedLink]             = useState(false);
   const [showInvitePopup, setShowInvitePopup]   = useState(true);
+  const [isFullscreen, setIsFullscreen]         = useState(false);
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting | connected | error | disconnected
   const [cameraError, setCameraError]           = useState(false);
   const [initDone, setInitDone]                 = useState(false);
@@ -324,6 +326,25 @@ export default function MeetingRoom() {
     }
   }, [chatMessages]);
 
+  // Fullscreen state listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Click-outside listener for View dropdown
+  useEffect(() => {
+    if (!showViewDropdown) return;
+    const closeDropdown = () => setShowViewDropdown(false);
+    document.addEventListener('click', closeDropdown);
+    return () => document.removeEventListener('click', closeDropdown);
+  }, [showViewDropdown]);
+
   const sendChatMessage = (e) => {
     if (e) e.preventDefault();
     if (!newMessageText.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -456,6 +477,22 @@ export default function MeetingRoom() {
     }
   };
 
+  const toggleFullscreen = () => {
+    if (typeof document !== 'undefined') {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch((err) => {
+            console.warn(`Error attempting to exit fullscreen: ${err.message}`);
+          });
+        }
+      }
+    }
+  };
+
   // ─── STATUS HELPERS ────────────────────────────────────────
   const statusColor = {
     connecting: '#f59e0b',
@@ -519,6 +556,7 @@ export default function MeetingRoom() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
       {/* ── TOP BAR ── */}
@@ -545,11 +583,14 @@ export default function MeetingRoom() {
             </span>
           </div>
           
-          <div style={{ width: '1px', height: '14px', background: '#333333' }} />
-
-          <span style={{ color: '#e5e7eb', fontWeight: 500, fontSize: '13px' }}>
-            {meeting?.title || 'Meeting Room'}
-          </span>
+          {meeting?.title && meeting.title !== 'Meeting Room' && meeting.title !== 'My Instant Meeting' && (
+            <>
+              <div style={{ width: '1px', height: '14px', background: '#333333' }} />
+              <span style={{ color: '#e5e7eb', fontWeight: 500, fontSize: '13px' }}>
+                {meeting.title}
+              </span>
+            </>
+          )}
 
           <div
             style={{
@@ -562,24 +603,24 @@ export default function MeetingRoom() {
             }}
           >
             <span style={{ color: '#a3a3a3', fontSize: '11px', fontWeight: 500 }}>
-              Invite Link
+              Meeting ID: <span style={{ color: '#f3f4f6', fontFamily: 'monospace', marginLeft: '2px' }}>{id}</span>
             </span>
             <button
-              id="copy-meeting-link-btn"
-              onClick={copyLink}
-              title="Copy meeting link"
+              id="copy-meeting-id-btn"
+              onClick={copyMeetingId}
+              title="Copy meeting ID"
               style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: copied ? '#10b981' : '#8e8e8f',
+                color: copiedId ? '#10b981' : '#8e8e8f',
                 padding: '0',
                 display: 'flex',
                 alignItems: 'center',
                 transition: 'color 0.15s',
               }}
             >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copiedId ? <Check size={12} /> : <Copy size={12} />}
             </button>
           </div>
 
@@ -629,29 +670,79 @@ export default function MeetingRoom() {
 
           <div style={{ width: '1px', height: '14px', background: '#333333' }} />
 
-          {/* Zoom View Dropdown Toggle */}
-          <button
-            id="view-toggle-btn"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              color: '#f3f4f6',
-              fontSize: '12px',
-              fontWeight: 500,
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-          >
-            <LayoutGrid size={13} color="#f3f4f6" />
-            <span>View</span>
-          </button>
+          {/* Zoom View Dropdown Toggle Container */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="view-toggle-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewDropdown((prev) => !prev);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                color: '#f3f4f6',
+                fontSize: '12px',
+                fontWeight: 500,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+            >
+              <LayoutGrid size={13} color="#f3f4f6" />
+              <span>View</span>
+            </button>
+
+            {showViewDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '32px',
+                  right: 0,
+                  width: '160px',
+                  background: '#18181b',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '6px',
+                  padding: '4px 0',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5)',
+                  zIndex: 200,
+                }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFullscreen();
+                    setShowViewDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    color: '#f3f4f6',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ fontSize: '13px', width: '14px', display: 'inline-block', textAlign: 'center' }}>⛶</span>
+                  <span>{isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -711,7 +802,7 @@ export default function MeetingRoom() {
                   // ref callback: fires when element mounts/unmounts
                   localVideoRef.current = el;
                   // Immediately attach stream if already acquired (handles post-initDone mount)
-                  if (el && localStream.current) {
+                  if (el && localStream.current && el.srcObject !== localStream.current) {
                     el.srcObject = localStream.current;
                   }
                 }}
@@ -1242,11 +1333,134 @@ export default function MeetingRoom() {
           </button>
         </div>
       </div>
+      
+      {/* ── FLOATING INVITATION POP-UP (BOTTOM LEFT) ── */}
+      {showInvitePopup && (
+        <div
+          className="invite-popup-animation"
+          style={{
+            position: 'absolute',
+            bottom: '96px',
+            left: '24px',
+            width: '320px',
+            backgroundColor: '#18181b',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
+            padding: '16px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+            zIndex: 100,
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#ffffff', fontWeight: 600, fontSize: '14px' }}>
+                Invite Participants
+              </span>
+            </div>
+            <button
+              onClick={() => setShowInvitePopup(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#a1a1aa',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '4px',
+                lineHeight: 1,
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#a1a1aa')}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Description */}
+          <p style={{ color: '#a1a1aa', fontSize: '12px', lineHeight: '1.5', margin: '0 0 12px 0' }}>
+            Copy the meeting link below and share it with others to invite them to this meeting.
+          </p>
+
+          {/* Input & Copy Row */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <input
+              type="text"
+              readOnly
+              value={typeof window !== 'undefined' ? `${window.location.origin}/meeting/${id}` : ''}
+              style={{
+                width: '100%',
+                background: '#09090b',
+                border: '1px solid #27272a',
+                borderRadius: '6px',
+                padding: '8px 10px',
+                color: '#e4e4e7',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                outline: 'none',
+                textOverflow: 'ellipsis',
+              }}
+              onClick={(e) => e.currentTarget.select()}
+            />
+            <button
+              onClick={copyMeetingLink}
+              style={{
+                width: '100%',
+                background: copiedLink ? '#10b981' : '#0B5CFF',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'background-color 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={(e) => {
+                if (!copiedLink) e.currentTarget.style.background = '#024ecf';
+              }}
+              onMouseLeave={(e) => {
+                if (!copiedLink) e.currentTarget.style.background = '#0B5CFF';
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .invite-popup-animation {
+          animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>

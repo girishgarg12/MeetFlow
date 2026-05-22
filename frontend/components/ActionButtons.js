@@ -22,7 +22,7 @@ export default function ActionButtons() {
     setCreating(true);
     try {
       const res = await createMeeting({
-        title: 'My Instant Meeting',
+        title: 'Meeting Room',
         host_name: 'Girish',
         meeting_type: 'instant',
       });
