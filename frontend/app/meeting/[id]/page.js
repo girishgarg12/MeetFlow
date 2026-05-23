@@ -705,7 +705,7 @@ export default function MeetingRoom() {
     return (
       <div
         style={{
-          height: '100vh',
+          height: '100dvh',
           background: '#111827',
           display: 'flex',
           flexDirection: 'column',
@@ -725,7 +725,7 @@ export default function MeetingRoom() {
   return (
     <div
       style={{
-        height: '100vh',
+        height: '100dvh',
         background: '#0c0c0c',
         display: 'flex',
         flexDirection: 'column',

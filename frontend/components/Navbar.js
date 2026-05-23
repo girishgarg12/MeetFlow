@@ -1,11 +1,21 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Video, Search, Bell, Settings, LogOut, User } from 'lucide-react';
+
+// Deterministic avatar colour from name
+const getAvatarBg = (name) => {
+  const palettes = ['#0B5CFF', '#7c3aed', '#0891b2', '#059669', '#d97706'];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return palettes[Math.abs(h) % palettes.length];
+};
 
 export default function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const avatarRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -15,6 +25,18 @@ export default function Navbar() {
     }
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showDropdown) return;
+    const close = (e) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showDropdown]);
+
   const handleSignOut = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userName');
@@ -22,8 +44,16 @@ export default function Navbar() {
     localStorage.removeItem('participantMeetingId');
     localStorage.removeItem('isHost');
     setUser(null);
+    setShowDropdown(false);
     window.location.reload();
   };
+
+  const displayName = user ? user.username : 'Girish';
+  const isGuest = !user;
+  const color = getAvatarBg(displayName);
+  const avatarBg = isGuest
+    ? 'linear-gradient(135deg, #6b7280, #4b5563)'
+    : `linear-gradient(135deg, ${color}, ${color}cc)`;
 
   return (
     <nav
@@ -60,7 +90,7 @@ export default function Navbar() {
         </span>
       </div>
 
-      {/* Center: Search */}
+      {/* Center: Search (desktop only) */}
       <div
         style={{
           alignItems: 'center',
@@ -88,9 +118,9 @@ export default function Navbar() {
         />
       </div>
 
-      {/* Right: Icons + Avatar */}
+      {/* Right: Actions + Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Sign In / Sign Out Button */}
+        {/* Sign In / Sign Out button */}
         {user ? (
           <button
             onClick={handleSignOut}
@@ -148,19 +178,15 @@ export default function Navbar() {
           </button>
         )}
 
+        {/* Notification & Settings — desktop only */}
         <button
           title="Notifications"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '8px',
-            alignItems: 'center',
-            color: '#6b7280',
-            transition: 'background 0.15s',
-          }}
           className="hidden md:flex"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '6px', borderRadius: '8px',
+            alignItems: 'center', color: '#6b7280', transition: 'background 0.15s',
+          }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
         >
@@ -168,41 +194,165 @@ export default function Navbar() {
         </button>
         <button
           title="Settings"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '8px',
-            alignItems: 'center',
-            color: '#6b7280',
-            transition: 'background 0.15s',
-          }}
           className="hidden md:flex"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '6px', borderRadius: '8px',
+            alignItems: 'center', color: '#6b7280', transition: 'background 0.15s',
+          }}
           onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
         >
           <Settings size={19} />
         </button>
-        
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0B5CFF, #0047CC)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(11,92,255,0.3)',
-          }}
-          title={user ? user.username : 'Girish (Guest)'}
-        >
-          {user ? user.username.charAt(0).toUpperCase() : 'G'}
+
+        {/* ── Avatar with dropdown ── */}
+        <div ref={avatarRef} style={{ position: 'relative' }}>
+          {/* Circle button */}
+          <div
+            id="avatar-btn"
+            onClick={() => setShowDropdown((v) => !v)}
+            title={displayName}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: avatarBg,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: showDropdown
+                ? '0 0 0 3px rgba(11,92,255,0.25)'
+                : '0 2px 6px rgba(0,0,0,0.15)',
+              transition: 'box-shadow 0.15s',
+              userSelect: 'none',
+            }}
+          >
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+
+          {/* Dropdown */}
+          {showDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 10px)',
+                right: 0,
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                minWidth: '210px',
+                zIndex: 200,
+                overflow: 'hidden',
+              }}
+            >
+              {/* User info header */}
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                {/* Mini avatar */}
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: avatarBg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Name + badge */}
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#111827',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {displayName}
+                  </p>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      marginTop: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '20px',
+                      background: isGuest ? '#f3f4f6' : '#eff6ff',
+                      color: isGuest ? '#6b7280' : '#2563eb',
+                      border: isGuest ? '1px solid #e5e7eb' : '1px solid #bfdbfe',
+                    }}
+                  >
+                    {isGuest ? 'Default User' : 'Signed In'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action row */}
+              <div style={{ padding: '6px' }}>
+                {isGuest ? (
+                  <button
+                    id="avatar-create-account-btn"
+                    onClick={() => { setShowDropdown(false); router.push('/login'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', background: 'none', border: 'none',
+                      borderRadius: '8px', padding: '9px 10px',
+                      cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+                      color: '#0B5CFF', transition: 'background 0.12s', textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    <User size={14} />
+                    Create your account
+                  </button>
+                ) : (
+                  <button
+                    id="avatar-signout-btn"
+                    onClick={handleSignOut}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      width: '100%', background: 'none', border: 'none',
+                      borderRadius: '8px', padding: '9px 10px',
+                      cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+                      color: '#dc2626', transition: 'background 0.12s', textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    <LogOut size={14} />
+                    Sign Out
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </nav>
