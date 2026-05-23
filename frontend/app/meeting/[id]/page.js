@@ -84,16 +84,28 @@ export default function MeetingRoom() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+
+      // Restore previous video-off state from localStorage
+      const savedVideoOff = localStorage.getItem('videoOff') === 'true';
+      if (savedVideoOff) {
+        // Stop the camera immediately so the hardware light turns off
+        stream.getVideoTracks().forEach((track) => track.stop());
+        setIsVideoOff(true);
+        isVideoOffRef.current = true;
+        // Don't attach to the video element since camera is off
+      } else {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
       }
+
       return stream;
     } catch (err) {
       console.warn('Camera/mic access denied:', err);
       setCameraError(true);
       return null;
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── 2. CREATE RTCPeerConnection ──────────────────────────
   const createPeerConnection = useCallback(
@@ -503,22 +515,62 @@ export default function MeetingRoom() {
     }
   };
 
-  const toggleVideo = () => {
-    if (localStream.current) {
-      const nextVideoOff = !isVideoOff;
-      localStream.current.getVideoTracks().forEach((track) => {
-        track.enabled = !nextVideoOff;
-      });
-      setIsVideoOff(nextVideoOff);
-      isVideoOffRef.current = nextVideoOff;
-      // Broadcast our video state to all peers via WS
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'video_state',
-          from: userNameRef.current,
-          videoOff: nextVideoOff,
-        }));
+  const toggleVideo = async () => {
+    const nextVideoOff = !isVideoOff;
+
+    if (nextVideoOff) {
+      // ── Turning video OFF: stop the track so the camera light turns off ──
+      if (localStream.current) {
+        localStream.current.getVideoTracks().forEach((track) => track.stop());
       }
+      // Hide local preview
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+    } else {
+      // ── Turning video ON: get a fresh camera stream ──
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+
+        // Replace the video track in every active peer connection
+        Object.values(peersRef.current).forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(newVideoTrack);
+          }
+        });
+
+        // Update the local stream ref — keep audio tracks, replace video
+        if (localStream.current) {
+          localStream.current.getVideoTracks().forEach((t) => localStream.current.removeTrack(t));
+          localStream.current.addTrack(newVideoTrack);
+        } else {
+          localStream.current = newStream;
+        }
+
+        // Show local preview
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream.current;
+        }
+      } catch (err) {
+        console.warn('Could not restart camera:', err);
+        setCameraError(true);
+        return; // Don't update state if we couldn't get the camera back
+      }
+    }
+
+    setIsVideoOff(nextVideoOff);
+    isVideoOffRef.current = nextVideoOff;
+    localStorage.setItem('videoOff', nextVideoOff);
+
+    // Broadcast our new video state to all peers via WS
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'video_state',
+        from: userNameRef.current,
+        videoOff: nextVideoOff,
+      }));
     }
   };
 
@@ -535,6 +587,7 @@ export default function MeetingRoom() {
     }
     if (localStream.current) localStream.current.getTracks().forEach((t) => t.stop());
     if (wsRef.current) wsRef.current.close();
+    localStorage.removeItem('videoOff'); // clear so next meeting starts fresh
     router.push('/');
   };
 
