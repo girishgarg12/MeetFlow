@@ -32,7 +32,7 @@ export default function MeetingRoom() {
   const router = useRouter();
   const { id } = useParams();
 
-  // ─── STATE ────────────────────────────────────────────────
+  // State
   const [meeting, setMeeting]                   = useState(null);
   const [participants, setParticipants]         = useState([]);
   const [isMuted, setIsMuted]                   = useState(false);
@@ -57,7 +57,7 @@ export default function MeetingRoom() {
   const [isHost, setIsHost] = useState(false);
   const userNameRef = useRef('');
 
-  // ─── REFS ─────────────────────────────────────────────────
+  // Refs
   const localVideoRef     = useRef(null);
   const localStream       = useRef(null);
   const wsRef             = useRef(null);
@@ -71,7 +71,7 @@ export default function MeetingRoom() {
   // Ref mirror of isVideoOff so WS callbacks (closures) always read the latest value
   const isVideoOffRef     = useRef(false);
 
-  // ─── WEBRTC CONFIG ─────────────────────────────────────────
+  // WebRTC configuration
   const RTC_CONFIG = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -79,7 +79,7 @@ export default function MeetingRoom() {
     ],
   };
 
-  // ─── 1. GET USER CAMERA ─────────────────────────────────────
+  // Start local video and audio stream
   const startLocalStream = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -107,7 +107,7 @@ export default function MeetingRoom() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── 2. CREATE RTCPeerConnection ──────────────────────────
+  // Create RTCPeerConnection for a user
   const createPeerConnection = useCallback(
     (targetUser) => {
       // Close any existing connection cleanly
@@ -165,7 +165,7 @@ export default function MeetingRoom() {
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // ─── FLUSH QUEUED ICE CANDIDATES ─────────────────────────
+  // Flush any queued ICE candidates
   // Must be called after setRemoteDescription completes
   const flushIceCandidates = useCallback(async (targetUser) => {
     const pc = peersRef.current[targetUser];
@@ -180,7 +180,7 @@ export default function MeetingRoom() {
     }
   }, []);
 
-  // ─── REATTACH REMOTE STREAMS AFTER REACT RE-RENDERS ───────────
+  // Reattach remote streams after UI updates
   // When participants list changes, React may create new video elements.
   // If ontrack already fired before the element existed, reattach from the stored ref.
   useEffect(() => {
@@ -192,7 +192,7 @@ export default function MeetingRoom() {
     });
   }, [participants]); // runs every time participants list changes
 
-  // ─── ATTACH LOCAL STREAM ONCE MEETING UI IS VISIBLE ─────────
+  // Attach local stream when UI is ready
   // startLocalStream runs BEFORE initDone=true renders the video element,
   // so localVideoRef.current is null at that point. This effect fires after
   // the video element mounts and ensures srcObject is always attached.
@@ -204,7 +204,7 @@ export default function MeetingRoom() {
     }
   }, [initDone]);
 
-  // ─── 3. WEBSOCKET + SIGNALING ────────────────────────────
+  // WebSocket signaling handler
   const connectWebSocket = useCallback((nameToUse) => {
     // Guard against duplicate connection attempts
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -401,7 +401,7 @@ export default function MeetingRoom() {
     setNewMessageText('');
   };
 
-  // ─── 4. INITIALIZE ────────────────────────────────────────
+  // Initialize the room (fetch details, join session, set up local media)
   useEffect(() => {
     const storedName = localStorage.getItem('userName');
     const storedIsHost = localStorage.getItem('isHost') === 'true';
@@ -504,7 +504,7 @@ export default function MeetingRoom() {
     };
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── CONTROLS ─────────────────────────────────────────────
+  // Meeting controls
 
   const toggleMute = () => {
     if (localStream.current) {
@@ -624,7 +624,7 @@ export default function MeetingRoom() {
     }
   };
 
-  // ─── STATUS HELPERS ────────────────────────────────────────
+  // Connection status color and label mappings
   const statusColor = {
     connecting: '#f59e0b',
     connected: '#10b981',
@@ -642,7 +642,7 @@ export default function MeetingRoom() {
   // Remote participants (excluding self)
   const remoteParticipants = participants.filter((p) => p.name !== userName);
 
-  // ─── RESPONSIVE GRID LAYOUT ────────────────────────────────
+  // Calculate grid template based on participant count
   // Returns CSS grid template based on total tile count
   const totalTiles = remoteParticipants.length + 1; // +1 for self
   const getGridStyle = (count) => {
@@ -656,7 +656,7 @@ export default function MeetingRoom() {
   };
   const gridLayout = getGridStyle(totalTiles);
 
-  // ─── RENDER ───────────────────────────────────────────────
+  // UI rendering
 
   if (!initDone) {
     return (
@@ -1616,7 +1616,7 @@ export default function MeetingRoom() {
   );
 }
 
-// ─── Control Button Component ──────────────────────────────────
+// Control Button Helper Component
 function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevron, badge }) {
   const isMuteOrVideo = id === 'toggle-mute-btn' || id === 'toggle-video-btn';
   const bg = active && !isMuteOrVideo 

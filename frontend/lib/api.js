@@ -16,22 +16,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ─── MEETING CALLS ────────────────────────────────────────────
-
+// Meeting endpoints
 export const createMeeting = (data) => api.post('/meetings/', data);
 export const getMeeting    = (id)   => api.get(`/meetings/${id}`);
 export const listMeetings  = ()     => api.get('/meetings/');
 export const endMeeting    = (id)   => api.patch(`/meetings/${id}/end`);
 export const deleteMeeting = (id)   => api.delete(`/meetings/${id}`);
 
-// ─── PARTICIPANT CALLS ────────────────────────────────────────
-
+// Participant endpoints
 export const joinMeeting     = (data) => api.post('/participants/', data);
 export const getParticipants = (id)   => api.get(`/participants/${id}`);
 export const leaveMeeting    = (id)   => api.patch(`/participants/${id}/leave`);
 
-// ─── AUTHENTICATION CALLS ─────────────────────────────────────
-
+// Authentication endpoints
 export const signup = (data) => api.post('/auth/signup', data);
 export const login  = (data) => api.post('/auth/login', data);
 export const getMe  = ()     => api.get('/auth/me');

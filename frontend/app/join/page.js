@@ -38,23 +38,23 @@ function JoinForm() {
 
     setLoading(true);
     try {
-      // Step 1: Validate meeting exists and is active
+      // check if meeting exists
       await getMeeting(meetingId.trim());
 
-      // Step 2: Register as participant
+      // join as participant
       const res = await joinMeeting({
         meeting_id: meetingId.trim(),
         name: name.trim(),
         is_host: false,
       });
 
-      // Step 3: Save info for meeting room
+      // save details locally
       localStorage.setItem('userName', res.data.name);
       localStorage.setItem('participantId', String(res.data.id));
       localStorage.setItem('participantMeetingId', meetingId.trim());
       localStorage.setItem('isHost', 'false');
 
-      // Step 4: Enter the meeting room
+      // redirect to meeting room
       router.push(`/meeting/${meetingId.trim()}`);
     } catch (err) {
       if (err.response?.status === 404) {
