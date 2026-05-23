@@ -1,94 +1,138 @@
-# MeetFlow — Video Conferencing Platform (Zoom Clone)
+# MeetFlow — Video Conferencing Platform
 
-A full-stack video conferencing web application built with a modern Next.js frontend and a FastAPI backend, utilizing WebSockets for signaling and WebRTC for direct peer-to-peer audio/video streaming.
+A full-stack video conferencing app built as part of a SDE Intern assignment. The goal was to replicate Zoom's core meeting workflows and design using Next.js and FastAPI.
+
+**Live Demo:** [meetfloww.vercel.app](https://meetfloww.vercel.app)
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Next.js, React, Tailwind CSS, Lucide React, Axios |
-| **Backend** | FastAPI, Python, Uvicorn, WebSockets |
-| **Database** | SQLite, SQLAlchemy ORM |
-| **Real-time API** | WebRTC (Peer-to-Peer), WebSockets (Signaling) |
+| Frontend | Next.js (App Router), React, Vanilla CSS, Lucide React, Axios |
+| Backend | FastAPI, Python, Uvicorn |
+| Database | SQLite, SQLAlchemy ORM |
+| Real-time | WebRTC (peer-to-peer A/V), WebSockets (signaling) |
+| Deployment | Vercel (frontend), Railway (backend) |
+
+---
 
 ## Features
 
-- **Dashboard (Home)**: Modern Zoom-style Command Center with live clock, quick meeting actions (Start instant, Join via ID, Schedule future meetings, Share screen placeholder), and lists of upcoming & past meetings.
-- **New Instant Meeting**: One-click meeting creation with a unique 9-character code and immediate transition to the meeting room.
-- **Join Meeting**: Clean join page validating meeting active status and registering the user in the database before entry.
-- **Schedule Meeting**: Advanced scheduler allowing users to choose the topic, agenda, date, time, and duration of future meetings.
-- **Meeting Room**: Direct peer-to-peer audio and video communication powered by WebRTC and STUN servers.
-  - Interactive toolbar with microphone toggle (mute/unmute), camera toggle, security overlay, participants count, and chat panel triggers.
-  - Real-time sync of active participants utilizing persistent WebSocket connections.
-  - Custom user profiles and avatars displayed if camera is deactivated.
-- **Responsive Navigation**: Retractable side menu and universal search navbar for rapid control.
+### Core
+
+- **Dashboard** — Zoom-style home with live clock, quick action buttons (New Meeting, Join, Schedule), upcoming meetings, and recent meetings list
+- **Instant Meeting** — One-click meeting creation with a unique 9-character ID and a shareable invite link
+- **Join Meeting** — Join via Meeting ID or invite link, enter a display name, validates meeting exists before entry
+- **Schedule Meeting** — Create future meetings with title, description, date, time, and duration; shows up in the upcoming meetings list
+- **Meeting Room** — Real peer-to-peer audio/video using WebRTC and Google STUN servers
+  - Mic and camera toggle
+  - Participants list with live join/leave updates
+  - In-meeting chat with unread message counter
+  - Leave meeting with confirmation dropdown
+  - Responsive grid layout that adjusts based on participant count
+
+### Auth (Bonus)
+
+- Login and Signup with JWT tokens
+- Profile avatar dropdown in navbar showing name and account status
+- Guest users (no account) are supported — default name is used
+
+---
+
+## What's UI-Only (No Backend)
+
+These elements exist purely to match Zoom's interface and are not functional:
+
+- **Search bar** in the navbar
+- **Notifications bell** and **Settings gear** icon
+- **Filters** on the meetings list
+
+---
 
 ## Project Structure
 
-```text
+```
 MeetFlow/
-├── backend/            # FastAPI application
-│   ├── main.py         # Application entry & WebSockets
-│   ├── database.py     # SQLite connection setup
-│   ├── models.py       # SQLAlchemy database schemas
-│   ├── schemas.py      # Pydantic data validators
-│   ├── crud.py         # Database operations
-│   ├── seed.py         # Sample data seeding script
-│   └── routers/        # API route groups
+├── backend/
+│   ├── main.py          # FastAPI app + WebSocket signaling server
+│   ├── models.py        # SQLAlchemy models (Meeting, Participant, User)
+│   ├── schemas.py       # Pydantic request/response schemas
+│   ├── crud.py          # Database operations
+│   ├── database.py      # SQLite connection and session setup
+│   ├── seed.py          # Seeds sample meetings and a default user
+│   └── routers/         # meetings, participants, auth
 │
-└── frontend/           # Next.js application
-    ├── app/            # Pages (Dashboard, Join, Schedule, Meeting)
-    ├── components/     # Reusable layout and button components
-    └── lib/            # Axios API calls
+└── frontend/
+    ├── app/             # Pages — dashboard, join, schedule, meeting room, login
+    ├── components/      # Navbar, reusable UI
+    └── lib/             # Axios API client
 ```
 
-## Setup Instructions
-
-### Prerequisites
-- Python 3.9+
-- Node.js 18+
-
-### 1. Backend Setup
-
-```bash
-cd backend
-# Create virtual environment
-python -m venv venv
-# Activate it (Windows)
-venv\Scripts\activate
-# Activate it (Mac/Linux)
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Seed the database
-python seed.py
-
-# Run the FastAPI server
-uvicorn main:app --reload --port 8000
-```
-FastAPI interactive docs will be available at: http://localhost:8000/docs
-
-### 2. Frontend Setup
-
-```bash
-cd frontend
-# Install npm dependencies
-npm install
-
-# Start the Next.js development server
-npm run dev
-```
-The application will be accessible at: http://localhost:3000
+---
 
 ## Database Schema
 
-- **meetings** table: `id`, `title`, `description`, `host_name`, `meeting_type`, `scheduled_at`, `duration`, `invite_link`, `is_active`, `created_at`
-- **participants** table: `id`, `meeting_id` (FK), `name`, `joined_at`, `left_at`, `is_host`, `is_muted`, `is_video_on`
+Three tables:
 
-## Key Design & Architecture Decisions
+**users** — `id`, `username`, `email`, `hashed_password`, `created_at`
 
-1. **Tailwind CSS v4 & PostCSS Integration**: Built with the latest Tailwind CSS v4, allowing fast builds and CSS-based variables configuration. Renamed custom variables using the `--app-` prefix to maintain compatibility with Tailwind's standard sizing utility scale.
-2. **Hydration Mismatch Mitigation**: Safely initialized all client-specific browser interfaces (clock, `localStorage` checks) using lazy state loads and standard React `useEffect` mount cycles.
-3. **Robust Layouts**: Relied on Flexbox shrink and gap controls in place of fragile sibling spacing properties for maximum responsiveness.
+**meetings** — `id` (9-char), `title`, `description`, `host_name`, `host_id` (FK → users), `meeting_type`, `scheduled_at`, `duration`, `invite_link`, `is_active`, `created_at`
+
+**participants** — `id`, `meeting_id` (FK → meetings), `name`, `user_id` (FK → users, nullable for guests), `joined_at`, `left_at`, `is_host`, `is_muted`, `is_video_on`
+
+`user_id` is nullable so unauthenticated (guest) users can join without an account.
+
+---
+
+## Setup — Local Development
+
+**Prerequisites:** Python 3.9+, Node.js 18+
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+# Mac/Linux
+source venv/bin/activate
+
+pip install -r requirements.txt
+python seed.py
+uvicorn main:app --reload --port 8000
+```
+
+API docs available at `http://localhost:8000/docs`
+
+### Frontend
+
+Create `frontend/.env.local`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000
+```
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App runs at `http://localhost:3000`
+
+---
+
+## A Few Implementation Notes
+
+- **WebRTC signaling** uses a WebSocket server on FastAPI. Each participant gets a UUID (`peerId`) generated client-side per session. All offer/answer/ICE messages route by `peerId`, not by display name — this allows multiple participants with the same display name to coexist without connection conflicts.
+
+- **Guest support** — the app works without login. A default user ("Girish") is seeded. Meetings are attributed via `host_name` for guests and `host_id` for logged-in users.
+
+- **No `100vh` on mobile** — the meeting room uses `100dvh` (dynamic viewport height) so the control bar doesn't hide behind the browser's address bar on mobile.
+
+- **Seeded data** — `seed.py` creates sample meetings and a default user so the dashboard isn't empty on first run.
