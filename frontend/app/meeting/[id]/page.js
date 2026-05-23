@@ -9,7 +9,15 @@ import {
 } from 'lucide-react';
 import { getMeeting, getParticipants, endMeeting, leaveMeeting, joinMeeting } from '@/lib/api';
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+// Auto-detect wss:// vs ws:// based on page protocol to avoid Mixed Content errors on HTTPS
+const getWsBase = () => {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return 'wss://meetflow-production-5f29.up.railway.app';
+  }
+  return 'ws://localhost:8000';
+};
+const WS_BASE = getWsBase();
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -70,6 +78,16 @@ export default function MeetingRoom() {
   const remoteStreamsRef  = useRef({}); // { userName: MediaStream }
   // Ref mirror of isVideoOff so WS callbacks (closures) always read the latest value
   const isVideoOffRef     = useRef(false);
+
+  // Track viewport width so grid layout adapts to mobile/tablet/desktop
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // WebRTC configuration
   const RTC_CONFIG = {
@@ -642,17 +660,32 @@ export default function MeetingRoom() {
   // Remote participants (excluding self)
   const remoteParticipants = participants.filter((p) => p.name !== userName);
 
-  // Calculate grid template based on participant count
-  // Returns CSS grid template based on total tile count
+  // Calculate grid template based on participant count AND viewport width
   const totalTiles = remoteParticipants.length + 1; // +1 for self
   const getGridStyle = (count) => {
-    if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
-    if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
-    if (count === 3) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr' }; // 3 side-by-side
-    if (count === 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' };
-    if (count <= 6) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' };
-    if (count <= 9) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr' };
-    return { gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto' };
+    // Determine max columns based on screen width
+    const isMobile = windowWidth < 640;   // phones
+    const isTablet = windowWidth < 1024;  // tablets / small laptops
+
+    // Max columns per breakpoint — keep tiles tall enough to be usable
+    const maxCols = isMobile ? 2 : isTablet ? 2 : 3;
+
+    if (count === 1) {
+      return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' };
+    }
+    if (count === 2) {
+      // On mobile portrait stack vertically so each face fills more width
+      if (isMobile) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr 1fr' };
+      return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' };
+    }
+
+    // For 3+ tiles: calculate balanced columns/rows capped at maxCols
+    const cols = Math.min(count, maxCols);
+    const rows = Math.ceil(count / cols);
+    return {
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+    };
   };
   const gridLayout = getGridStyle(totalTiles);
 
@@ -918,9 +951,9 @@ export default function MeetingRoom() {
               flex: 1,
               display: 'grid',
               ...gridLayout,
-              gap: '10px',
-              padding: '12px',
-              overflow: 'hidden',
+              gap: windowWidth < 640 ? '6px' : '10px',
+              padding: windowWidth < 640 ? '8px' : '12px',
+              overflow: totalTiles > 6 ? 'auto' : 'hidden',
             }}
           >
             {/* Local (self) video */}
@@ -958,7 +991,7 @@ export default function MeetingRoom() {
                 }}
               />
               {/* Height anchor: keeps the tile in the grid when video is off */}
-              <div style={{ width: '100%', height: '100%', minHeight: '200px' }} />
+              <div style={{ width: '100%', height: '100%', minHeight: '120px' }} />
               {(isVideoOff || cameraError) && (
                 <div
                   style={{
