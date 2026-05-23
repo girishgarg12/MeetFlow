@@ -71,15 +71,18 @@ export default function MeetingRoom() {
   const localVideoRef     = useRef(null);
   const localStream       = useRef(null);
   const wsRef             = useRef(null);
-  const peersRef          = useRef({});
-  // ICE candidates that arrive before remoteDescription is set are queued here
-  const iceCandidateQueue = useRef({}); // { userName: [RTCIceCandidateInit, ...] }
-  // Per-peer negotiation lock — prevents duplicate offer/answer while one is in flight
-  const negotiatingRef    = useRef({}); // { userName: boolean }
-  // Stores remote MediaStreams so they can be re-attached after React re-renders the video elements
-  const remoteStreamsRef  = useRef({}); // { userName: MediaStream }
-  // Ref mirror of isVideoOff so WS callbacks (closures) always read the latest value
+  const peersRef          = useRef({});         // { peerId: RTCPeerConnection }
+  const iceCandidateQueue = useRef({});         // { peerId: [RTCIceCandidateInit, ...] }
+  const negotiatingRef    = useRef({});         // { peerId: boolean }
+  const remoteStreamsRef  = useRef({});         // { peerId: MediaStream }
+  const peerNamesRef      = useRef({});         // { peerId: displayName } — for rendering
   const isVideoOffRef     = useRef(false);
+  // Stable UUID for this session — used as the unique peer identity in signaling
+  const peerIdRef         = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36)
+  );
 
   // Track viewport width so grid layout adapts to mobile/tablet/desktop
   const [windowWidth, setWindowWidth] = useState(
@@ -137,15 +140,13 @@ export default function MeetingRoom() {
 
   // Create RTCPeerConnection for a user
   const createPeerConnection = useCallback(
-    (targetUser) => {
-      // Close any existing connection cleanly
-      if (peersRef.current[targetUser]) {
-        peersRef.current[targetUser].close();
-        delete peersRef.current[targetUser];
+    (targetPeerId) => {  // keyed by peerId, not name
+      if (peersRef.current[targetPeerId]) {
+        peersRef.current[targetPeerId].close();
+        delete peersRef.current[targetPeerId];
       }
-      // Reset ICE queue for this peer
-      iceCandidateQueue.current[targetUser] = [];
-      negotiatingRef.current[targetUser] = false;
+      iceCandidateQueue.current[targetPeerId] = [];
+      negotiatingRef.current[targetPeerId] = false;
 
       const pc = new RTCPeerConnection(RTC_CONFIG);
 
@@ -156,38 +157,33 @@ export default function MeetingRoom() {
         });
       }
 
-      // On remote stream → store it, then attach to video element if already in DOM
+      // On remote stream → store by peerId, attach to video element
       pc.ontrack = (event) => {
         if (!event.streams[0]) return;
         const stream = event.streams[0];
-        // Always persist the stream so we can reattach if the element hasn't rendered yet
-        remoteStreamsRef.current[targetUser] = stream;
-        const remoteVideo = document.getElementById(`video-${targetUser}`);
-        if (remoteVideo) {
-          remoteVideo.srcObject = stream;
-        }
-        // Trigger re-render so the useEffect below can catch and attach if element wasn't ready
+        remoteStreamsRef.current[targetPeerId] = stream;
+        const remoteVideo = document.getElementById(`video-${targetPeerId}`);
+        if (remoteVideo) remoteVideo.srcObject = stream;
+        // Add to participant list if not already there (keyed by peerId)
         setParticipants((prev) => {
-          if (prev.find((p) => p.name === targetUser)) return prev;
-          return [...prev, { name: targetUser, is_host: false }];
+          if (prev.find((p) => p.peerId === targetPeerId)) return prev;
+          return [...prev, { peerId: targetPeerId, name: peerNamesRef.current[targetPeerId] || targetPeerId, is_host: false }];
         });
       };
 
-      // Send ICE candidates via WebSocket
+      // Send ICE candidates via WebSocket (targeted by peerId)
       pc.onicecandidate = (event) => {
         if (event.candidate && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(
-            JSON.stringify({
-              type: 'ice-candidate',
-              candidate: event.candidate,
-              target: targetUser,
-              from: userNameRef.current,
-            })
-          );
+          wsRef.current.send(JSON.stringify({
+            type: 'ice-candidate',
+            candidate: event.candidate,
+            target: targetPeerId,       // route to the specific peer
+            from: peerIdRef.current,
+          }));
         }
       };
 
-      peersRef.current[targetUser] = pc;
+      peersRef.current[targetPeerId] = pc;
       return pc;
     },
     [] // eslint-disable-line react-hooks/exhaustive-deps
@@ -212,8 +208,8 @@ export default function MeetingRoom() {
   // When participants list changes, React may create new video elements.
   // If ontrack already fired before the element existed, reattach from the stored ref.
   useEffect(() => {
-    Object.entries(remoteStreamsRef.current).forEach(([peerName, stream]) => {
-      const el = document.getElementById(`video-${peerName}`);
+    Object.entries(remoteStreamsRef.current).forEach(([peerId, stream]) => {
+      const el = document.getElementById(`video-${peerId}`);
       if (el && el.srcObject !== stream) {
         el.srcObject = stream;
       }
@@ -233,155 +229,136 @@ export default function MeetingRoom() {
   }, [initDone]);
 
   // WebSocket signaling handler
-  const connectWebSocket = useCallback((nameToUse) => {
-    // Guard against duplicate connection attempts
+  const connectWebSocket = useCallback((nameToUse, myPeerId) => {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-      console.log('WebSocket connection already active or connecting');
       return;
     }
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
+    if (wsRef.current) wsRef.current.close();
 
-    const ws = new WebSocket(`${WS_BASE}/ws/${id}/${encodeURIComponent(nameToUse)}`);
+    // URL now carries both the stable peerId and the display name
+    const ws = new WebSocket(`${WS_BASE}/ws/${id}/${encodeURIComponent(myPeerId)}/${encodeURIComponent(nameToUse)}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
       setConnectionStatus('connected');
-      // Broadcast our initial video state so existing peers know our camera status
       ws.send(JSON.stringify({
         type: 'video_state',
-        from: nameToUse,
+        from: myPeerId,
         videoOff: isVideoOffRef.current,
       }));
     };
 
     ws.onmessage = async (event) => {
       let message;
-      try {
-        message = JSON.parse(event.data);
-      } catch {
-        return;
-      }
+      try { message = JSON.parse(event.data); } catch { return; }
 
-      // ── Someone new joined → broadcast our current video state so they see it correctly ──
-      if (message.type === 'user_joined' && message.user !== nameToUse) {
-        // Guard: skip if already negotiating with this user
-        if (negotiatingRef.current[message.user]) return;
-        negotiatingRef.current[message.user] = true;
+      // ── Someone new joined ──
+      if (message.type === 'user_joined' && message.peerId !== myPeerId) {
+        const remotePeerId = message.peerId;
+        const remoteName   = message.name;
+        if (negotiatingRef.current[remotePeerId]) return;
+        negotiatingRef.current[remotePeerId] = true;
+        // Remember their display name for rendering
+        peerNamesRef.current[remotePeerId] = remoteName;
 
-        // Tell the new joiner our current video state
+        // Tell the new joiner our video state
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({
             type: 'video_state',
-            from: nameToUse,
+            from: myPeerId,
             videoOff: isVideoOffRef.current,
           }));
         }
 
-        const pc = createPeerConnection(message.user);
+        const pc = createPeerConnection(remotePeerId);
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          ws.send(JSON.stringify({ type: 'offer', offer, target: message.user, from: nameToUse }));
+          ws.send(JSON.stringify({ type: 'offer', offer, target: remotePeerId, from: myPeerId, fromName: nameToUse }));
         } catch (e) {
           console.error('Error creating offer:', e);
-          negotiatingRef.current[message.user] = false;
+          negotiatingRef.current[remotePeerId] = false;
         }
         setParticipants((prev) => {
-          if (prev.find((p) => p.name === message.user)) return prev;
-          return [...prev, { name: message.user, is_host: false }];
+          if (prev.find((p) => p.peerId === remotePeerId)) return prev;
+          return [...prev, { peerId: remotePeerId, name: remoteName, is_host: false }];
         });
       }
 
       // ── Received an offer → we are the answerer ──
-      else if (message.type === 'offer' && message.target === nameToUse) {
-        const pc = createPeerConnection(message.from);
+      else if (message.type === 'offer' && message.target === myPeerId) {
+        const remotePeerId = message.from;
+        // Store the sender's name — critical for late joiners who missed user_joined
+        if (message.fromName) peerNamesRef.current[remotePeerId] = message.fromName;
+        const remoteName = peerNamesRef.current[remotePeerId] || remotePeerId;
+        const pc = createPeerConnection(remotePeerId);
         try {
-          // Only accept offer when in correct state
           if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-pranswer') {
             await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
-            await flushIceCandidates(message.from); // apply any queued candidates
+            await flushIceCandidates(remotePeerId);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            ws.send(JSON.stringify({ type: 'answer', answer, target: message.from, from: nameToUse }));
+            ws.send(JSON.stringify({ type: 'answer', answer, target: remotePeerId, from: myPeerId }));
           }
-        } catch (e) {
-          console.error('Error handling offer:', e);
-        }
+        } catch (e) { console.error('Error handling offer:', e); }
         setParticipants((prev) => {
-          if (prev.find((p) => p.name === message.from)) return prev;
-          return [...prev, { name: message.from, is_host: false }];
+          if (prev.find((p) => p.peerId === remotePeerId)) return prev;
+          return [...prev, { peerId: remotePeerId, name: remoteName, is_host: false }];
         });
       }
 
-      // ── Received an answer → complete the handshake ──
-      else if (message.type === 'answer' && message.target === nameToUse) {
+      // ── Received an answer ──
+      else if (message.type === 'answer' && message.target === myPeerId) {
         const pc = peersRef.current[message.from];
-        // Only apply answer when we are waiting for one (have-local-offer state)
         if (pc && pc.signalingState === 'have-local-offer') {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(message.answer));
-            await flushIceCandidates(message.from); // apply any queued candidates
-          } catch (e) {
-            console.error('Error setting remote answer:', e);
-          } finally {
-            negotiatingRef.current[message.from] = false;
-          }
+            await flushIceCandidates(message.from);
+          } catch (e) { console.error('Error setting remote answer:', e); }
+          finally { negotiatingRef.current[message.from] = false; }
         }
       }
 
       // ── ICE candidate ──
-      else if (message.type === 'ice-candidate' && message.target === nameToUse) {
+      else if (message.type === 'ice-candidate' && message.target === myPeerId) {
         const pc = peersRef.current[message.from];
         if (!pc) return;
-
         if (pc.remoteDescription && pc.remoteDescription.type) {
-          // Remote description already set → add immediately
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
-          } catch (e) {
-            console.warn('ICE candidate error:', e);
-          }
+          try { await pc.addIceCandidate(new RTCIceCandidate(message.candidate)); }
+          catch (e) { console.warn('ICE candidate error:', e); }
         } else {
-          // Remote description not set yet → queue for later
-          if (!iceCandidateQueue.current[message.from]) {
-            iceCandidateQueue.current[message.from] = [];
-          }
+          if (!iceCandidateQueue.current[message.from]) iceCandidateQueue.current[message.from] = [];
           iceCandidateQueue.current[message.from].push(message.candidate);
         }
       }
 
-      // ── Received a chat message ──
+      // ── Chat message ──
       else if (message.type === 'chat') {
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            sender: message.sender,
-            text: message.text,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
-        // Increment unread badge only when chat panel is closed
-        if (!showChatRef.current) {
-          setUnreadCount((n) => n + 1);
-        }
+        setChatMessages((prev) => [...prev, {
+          sender: message.sender,
+          text: message.text,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+        if (!showChatRef.current) setUnreadCount((n) => n + 1);
       }
 
-      // ── Remote participant toggled their video ──
-      else if (message.type === 'video_state' && message.from !== nameToUse) {
+      // ── Remote video state ──
+      else if (message.type === 'video_state' && message.from !== myPeerId) {
+        // key remoteVideoOff by peerId
         setRemoteVideoOff((prev) => ({ ...prev, [message.from]: message.videoOff }));
       }
 
       // ── Someone left ──
       else if (message.type === 'user_left') {
-        setParticipants((prev) => prev.filter((p) => p.name !== message.user));
-        if (peersRef.current[message.user]) {
-          peersRef.current[message.user].close();
-          delete peersRef.current[message.user];
+        const remotePeerId = message.peerId;
+        setParticipants((prev) => prev.filter((p) => p.peerId !== remotePeerId));
+        if (peersRef.current[remotePeerId]) {
+          peersRef.current[remotePeerId].close();
+          delete peersRef.current[remotePeerId];
         }
-        delete iceCandidateQueue.current[message.user];
-        delete negotiatingRef.current[message.user];
+        delete iceCandidateQueue.current[remotePeerId];
+        delete negotiatingRef.current[remotePeerId];
+        delete peerNamesRef.current[remotePeerId];
       }
     };
 
@@ -496,7 +473,7 @@ export default function MeetingRoom() {
           return;
         }
 
-        connectWebSocket(storedName);
+        connectWebSocket(storedName, peerIdRef.current);
         setInitDone(true);
       } catch (err) {
         if (!active) return;
@@ -667,8 +644,10 @@ export default function MeetingRoom() {
     disconnected: 'Disconnected',
   };
 
-  // Remote participants (excluding self)
-  const remoteParticipants = participants.filter((p) => p.name !== userName);
+  // Remote participants: only WebRTC-connected peers (have peerId) excluding ourselves
+  const remoteParticipants = participants.filter(
+    (p) => p.peerId && p.peerId !== peerIdRef.current
+  );
 
   // Calculate grid template based on participant count AND viewport width
   const totalTiles = remoteParticipants.length + 1; // +1 for self
@@ -1060,7 +1039,7 @@ export default function MeetingRoom() {
             {/* Remote participants' videos */}
             {remoteParticipants.map((participant, idx) => (
               <div
-                key={participant.name}
+              key={participant.peerId}
                 style={{
                   background: '#161616',
                   borderRadius: '8px',
@@ -1072,7 +1051,7 @@ export default function MeetingRoom() {
                 }}
               >
                 <video
-                  id={`video-${participant.name}`}
+                  id={`video-${participant.peerId}`}
                   autoPlay
                   playsInline
                   style={{
@@ -1083,7 +1062,7 @@ export default function MeetingRoom() {
                     inset: 0,
                     zIndex: 2,
                     // Hide video element when remote video is off so avatar shows
-                    display: remoteVideoOff[participant.name] ? 'none' : 'block',
+                    display: remoteVideoOff[participant.peerId] ? 'none' : 'block',
                   }}
                 />
                 {/* Invisible height placeholder */}
@@ -1168,62 +1147,48 @@ export default function MeetingRoom() {
             >
               <Users size={15} color="#9ca3af" />
               <span style={{ color: '#f9fafb', fontWeight: 600, fontSize: '14px' }}>
-                Participants ({participants.length})
+                Participants ({remoteParticipants.length + 1})
               </span>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-              {participants.map((p) => (
+              {/* Self */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '8px 10px', borderRadius: '6px', marginBottom: '4px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: getAvatarColor(userName), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                  {userName.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ color: '#f9fafb', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
+                    {userName}
+                    <span style={{ color: '#9ca3af', fontSize: '11px', marginLeft: '4px' }}>(you)</span>
+                  </p>
+                  {isHost && <span style={{ color: '#60a5fa', fontSize: '11px' }}>Host</span>}
+                </div>
+              </div>
+              {/* Remote WebRTC-connected peers */}
+              {remoteParticipants.map((p) => (
                 <div
-                  key={p.id || p.name}
+                  key={p.peerId}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    marginBottom: '4px',
-                    background: p.name === userName ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-                    border: p.name === userName ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid transparent',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '8px 10px', borderRadius: '6px', marginBottom: '4px',
+                    background: 'transparent', border: '1px solid transparent',
                   }}
                 >
-                  <div
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '50%',
-                      background: getAvatarColor(p.name),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: getAvatarColor(p.name), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
                     {p.name.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <p
-                      style={{
-                        color: '#f9fafb',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
+                    <p style={{ color: '#f9fafb', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
                       {p.name}
-                      {p.name === userName && (
-                        <span style={{ color: '#9ca3af', fontSize: '11px', marginLeft: '4px' }}>
-                          (you)
-                        </span>
-                      )}
                     </p>
-                    {p.is_host && (
-                      <span style={{ color: '#60a5fa', fontSize: '11px' }}>Host</span>
-                    )}
+                    {p.is_host && <span style={{ color: '#60a5fa', fontSize: '11px' }}>Host</span>}
                   </div>
                 </div>
               ))}
@@ -1455,7 +1420,7 @@ export default function MeetingRoom() {
                     border: '1px solid #000000',
                   }}
                 >
-                  {participants.length}
+                  {remoteParticipants.length + 1}
                 </span>
               </div>
             }
