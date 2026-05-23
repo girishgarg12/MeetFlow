@@ -988,7 +988,7 @@ export default function MeetingRoom() {
                   position: 'absolute',
                   inset: 0,
                   zIndex: 1,
-                  transform: 'scaleX(1)', // override browser's default front-camera mirror flip
+                  transform: 'scaleX(-1)', // flip mirrored camera stream back to natural orientation
                 }}
               />
               {/* Height anchor: keeps the tile in the grid when video is off */}
