@@ -112,7 +112,7 @@ export default function LoginPage() {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea22, #764ba222)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 20% 50%, rgba(11,92,255,0.07) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(99,102,241,0.06) 0%, transparent 60%)', pointerEvents: 'none' }} />
 
-      <div style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)', position: 'relative', zIndex: 1 }} className="p-6 sm:p-10">
+      <div style={{ background: '#fff', borderRadius: '20px', padding: '40px 24px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>

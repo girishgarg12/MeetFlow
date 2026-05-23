@@ -89,11 +89,11 @@ export default function ScheduleMeeting() {
         style={{
           background: '#ffffff',
           borderRadius: '22px',
+          padding: '40px 24px',
           width: '100%',
           maxWidth: '500px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04)',
         }}
-        className="p-6 sm:p-10"
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
