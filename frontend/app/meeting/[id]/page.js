@@ -1260,7 +1260,7 @@ export default function MeetingRoom() {
                 </span>
               </div>
               <button
-                onClick={() => setShowChat(false)}
+                onClick={() => { showChatRef.current = false; setShowChat(false); }}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -1467,12 +1467,10 @@ export default function MeetingRoom() {
           <ControlButton
             id="chat-btn"
             onClick={() => {
-              setShowChat((c) => {
-                const next = !c;
-                showChatRef.current = next;
-                if (next) setUnreadCount(0);
-                return next;
-              });
+              const next = !showChatRef.current;
+              showChatRef.current = next;   // update ref synchronously first
+              setShowChat(next);
+              if (next) setUnreadCount(0);  // clear badge when opening chat
             }}
             active={showChat}
             icon={<MessageSquare size={20} color="#fff" />}
