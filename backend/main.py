@@ -1,4 +1,5 @@
 import config
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
@@ -14,9 +15,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,3 +84,8 @@ async def websocket_endpoint(websocket: WebSocket, meeting_id: str, user_name: s
             "user": user_name,
             "meeting_id": meeting_id
         }, meeting_id)
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
