@@ -63,7 +63,6 @@ export default function Navbar() {
       {/* Center: Search */}
       <div
         style={{
-          display: 'flex',
           alignItems: 'center',
           background: '#f3f4f6',
           borderRadius: '100px',
@@ -157,11 +156,11 @@ export default function Navbar() {
             cursor: 'pointer',
             padding: '6px',
             borderRadius: '8px',
-            display: 'flex',
             alignItems: 'center',
             color: '#6b7280',
             transition: 'background 0.15s',
           }}
+          className="hidden md:flex"
           onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
         >
@@ -175,11 +174,11 @@ export default function Navbar() {
             cursor: 'pointer',
             padding: '6px',
             borderRadius: '8px',
-            display: 'flex',
             alignItems: 'center',
             color: '#6b7280',
             transition: 'background 0.15s',
           }}
+          className="hidden md:flex"
           onMouseEnter={(e) => (e.currentTarget.style.background = '#f3f4f6')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
         >

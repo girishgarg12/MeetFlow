@@ -709,15 +709,24 @@ export default function MeetingRoom() {
             <span style={{ color: '#ffffff', fontWeight: 700, fontSize: '14px', letterSpacing: '-0.3px' }}>
               MeetFlow
             </span>
-            <span style={{ color: '#8e8e8f', fontWeight: 400, marginLeft: '4px', fontSize: '12px' }}>
+            <span 
+              style={{ color: '#8e8e8f', fontWeight: 400, fontSize: '12px' }}
+              className="hidden sm:inline ml-1"
+            >
               Workplace
             </span>
           </div>
           
           {meeting?.title && meeting.title !== 'Meeting Room' && meeting.title !== 'My Instant Meeting' && (
             <>
-              <div style={{ width: '1px', height: '14px', background: '#333333' }} />
-              <span style={{ color: '#e5e7eb', fontWeight: 500, fontSize: '13px' }}>
+              <div 
+                style={{ height: '14px', background: '#333333' }} 
+                className="hidden md:block w-[1px]"
+              />
+              <span 
+                style={{ color: '#e5e7eb', fontWeight: 500, fontSize: '13px' }}
+                className="hidden md:inline"
+              >
                 {meeting.title}
               </span>
             </>
@@ -734,7 +743,7 @@ export default function MeetingRoom() {
             }}
           >
             <span style={{ color: '#a3a3a3', fontSize: '11px', fontWeight: 500 }}>
-              Meeting ID: <span style={{ color: '#f3f4f6', fontFamily: 'monospace', marginLeft: '2px' }}>{id}</span>
+              <span className="hidden sm:inline">Meeting </span>ID: <span style={{ color: '#f3f4f6', fontFamily: 'monospace', marginLeft: '2px' }}>{id}</span>
             </span>
             <button
               id="copy-meeting-id-btn"
@@ -1340,14 +1349,11 @@ export default function MeetingRoom() {
         style={{
           background: '#000000',
           borderTop: '1px solid #1c1c1c',
-          padding: '12px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           flexShrink: 0,
           height: '80px',
           position: 'relative',
         }}
+        className="flex items-center justify-between px-3 sm:px-6 py-3"
       >
         {/* Left spacer for perfect centering */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
@@ -1355,7 +1361,7 @@ export default function MeetingRoom() {
         </div>
 
         {/* Center: Main Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Mute */}
           <ControlButton
             id="toggle-mute-btn"
@@ -1623,19 +1629,14 @@ function ControlButton({ id, onClick, active, activeColor, icon, label, hasChevr
       onClick={onClick}
       title={label}
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '8px 12px',
         background: bg,
         border: 'none',
         borderRadius: '10px',
         cursor: 'pointer',
         transition: 'background 0.15s, transform 0.1s',
-        minWidth: '80px',
         height: '58px',
       }}
+      className="flex flex-col items-center justify-between w-16 sm:w-20 px-1 sm:px-3 py-2"
       onMouseEnter={(e) => {
         if (!(active && !isMuteOrVideo)) {
           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';

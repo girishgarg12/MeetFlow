@@ -106,13 +106,13 @@ function JoinForm() {
         style={{
           background: '#ffffff',
           borderRadius: '20px',
-          padding: '40px',
           width: '100%',
           maxWidth: '440px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
           position: 'relative',
           zIndex: 1,
         }}
+        className="p-6 sm:p-10"
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>

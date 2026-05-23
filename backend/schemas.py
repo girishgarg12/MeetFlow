@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 from typing import Optional, List
+import re
 
 # Meeting Schemas
 
@@ -63,9 +64,34 @@ class ParticipantOut(BaseModel):
 # User Schemas
 
 class UserCreate(BaseModel):
-    email: str
+    email: EmailStr
     username: str
     password: str
+
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one number')
+        if not re.search(r'[^a-zA-Z0-9]', v):
+            raise ValueError('Password must contain at least one special character (!@#$...)')
+        return v
+
+    @field_validator('username')
+    @classmethod
+    def username_valid(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError('Username must be at least 2 characters long')
+        if len(v) > 30:
+            raise ValueError('Username must be 30 characters or less')
+        if not re.match(r'^[a-zA-Z0-9 _-]+$', v):
+            raise ValueError('Username can only contain letters, numbers, spaces, hyphens and underscores')
+        return v
 
 class UserLogin(BaseModel):
     email: str
