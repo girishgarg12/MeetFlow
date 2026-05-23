@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect("zoom_clone.db")
+conn = sqlite3.connect("MeetFlow.db")
 cursor = conn.cursor()
 
 print("--- MEETINGS ---")
