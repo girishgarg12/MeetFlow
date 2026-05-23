@@ -34,6 +34,10 @@ app.include_router(auth.router,         prefix="/api/auth",         tags=["Auth"
 def root():
     return {"message": "MeetFlow API is running"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
 # Store active WebSocket connections per meeting room
 
 class ConnectionManager:
