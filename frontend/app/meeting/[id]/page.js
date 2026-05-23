@@ -37,6 +37,7 @@ export default function MeetingRoom() {
   const [participants, setParticipants]         = useState([]);
   const [isMuted, setIsMuted]                   = useState(false);
   const [isVideoOff, setIsVideoOff]             = useState(false);
+  const [remoteVideoOff, setRemoteVideoOff]     = useState({});
   const [showParticipants, setShowParticipants] = useState(false);
   const [copiedId, setCopiedId]                 = useState(false);
   const [copiedLink, setCopiedLink]             = useState(false);
@@ -67,6 +68,8 @@ export default function MeetingRoom() {
   const negotiatingRef    = useRef({}); // { userName: boolean }
   // Stores remote MediaStreams so they can be re-attached after React re-renders the video elements
   const remoteStreamsRef  = useRef({}); // { userName: MediaStream }
+  // Ref mirror of isVideoOff so WS callbacks (closures) always read the latest value
+  const isVideoOffRef     = useRef(false);
 
   // ─── WEBRTC CONFIG ─────────────────────────────────────────
   const RTC_CONFIG = {
@@ -203,7 +206,15 @@ export default function MeetingRoom() {
     const ws = new WebSocket(`${WS_BASE}/ws/${id}/${encodeURIComponent(nameToUse)}`);
     wsRef.current = ws;
 
-    ws.onopen = () => setConnectionStatus('connected');
+    ws.onopen = () => {
+      setConnectionStatus('connected');
+      // Broadcast our initial video state so existing peers know our camera status
+      ws.send(JSON.stringify({
+        type: 'video_state',
+        from: nameToUse,
+        videoOff: isVideoOffRef.current,
+      }));
+    };
 
     ws.onmessage = async (event) => {
       let message;
@@ -213,11 +224,20 @@ export default function MeetingRoom() {
         return;
       }
 
-      // ── Someone new joined → we are the offerer ──
+      // ── Someone new joined → broadcast our current video state so they see it correctly ──
       if (message.type === 'user_joined' && message.user !== nameToUse) {
         // Guard: skip if already negotiating with this user
         if (negotiatingRef.current[message.user]) return;
         negotiatingRef.current[message.user] = true;
+
+        // Tell the new joiner our current video state
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'video_state',
+            from: nameToUse,
+            videoOff: isVideoOffRef.current,
+          }));
+        }
 
         const pc = createPeerConnection(message.user);
         try {
@@ -306,6 +326,11 @@ export default function MeetingRoom() {
         if (!showChatRef.current) {
           setUnreadCount((n) => n + 1);
         }
+      }
+
+      // ── Remote participant toggled their video ──
+      else if (message.type === 'video_state' && message.from !== nameToUse) {
+        setRemoteVideoOff((prev) => ({ ...prev, [message.from]: message.videoOff }));
       }
 
       // ── Someone left ──
@@ -480,10 +505,20 @@ export default function MeetingRoom() {
 
   const toggleVideo = () => {
     if (localStream.current) {
+      const nextVideoOff = !isVideoOff;
       localStream.current.getVideoTracks().forEach((track) => {
-        track.enabled = isVideoOff;
+        track.enabled = !nextVideoOff;
       });
-      setIsVideoOff(!isVideoOff);
+      setIsVideoOff(nextVideoOff);
+      isVideoOffRef.current = nextVideoOff;
+      // Broadcast our video state to all peers via WS
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'video_state',
+          from: userNameRef.current,
+          videoOff: nextVideoOff,
+        }));
+      }
     }
   };
 
@@ -940,7 +975,9 @@ export default function MeetingRoom() {
                     objectFit: 'cover',
                     position: 'absolute',
                     inset: 0,
-                    zIndex: 2, // must be above the avatar (zIndex:0) so video is visible
+                    zIndex: 2,
+                    // Hide video element when remote video is off so avatar shows
+                    display: remoteVideoOff[participant.name] ? 'none' : 'block',
                   }}
                 />
                 {/* Invisible height placeholder */}
