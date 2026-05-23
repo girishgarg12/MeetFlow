@@ -5,7 +5,7 @@ import {
   Mic, MicOff, Video, VideoOff, Phone,
   Users, MessageSquare, Shield, Copy, Check,
   Wifi, WifiOff, Loader2, ChevronUp, Smile,
-  MoreHorizontal, LayoutGrid, ShieldCheck
+  MoreHorizontal, LayoutGrid, ShieldCheck, DoorOpen
 } from 'lucide-react';
 import { getMeeting, getParticipants, endMeeting, leaveMeeting, joinMeeting } from '@/lib/api';
 
@@ -60,6 +60,8 @@ export default function MeetingRoom() {
   const [unreadCount, setUnreadCount]           = useState(0);
   const showChatRef                             = useRef(false);
   const [newMessageText, setNewMessageText]     = useState('');
+  const [showEndDropdown, setShowEndDropdown]   = useState(false);
+  const [showMobileControls, setShowMobileControls] = useState(false);
 
   const [userName, setUserName] = useState('');
   const [isHost, setIsHost] = useState(false);
@@ -88,6 +90,14 @@ export default function MeetingRoom() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Close the End dropdown if user clicks anywhere outside it
+  useEffect(() => {
+    if (!showEndDropdown) return;
+    const close = () => setShowEndDropdown(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showEndDropdown]);
 
   // WebRTC configuration
   const RTC_CONFIG = {
@@ -1380,22 +1390,27 @@ export default function MeetingRoom() {
 
       {/* ── CONTROL BAR ── */}
       <div
-        style={{
-          background: '#000000',
-          borderTop: '1px solid #1c1c1c',
-          flexShrink: 0,
-          height: '80px',
-          position: 'relative',
-        }}
         className="flex items-center justify-between px-3 sm:px-6 py-3"
+        style={{ background: '#000000', borderTop: '1px solid #1c1c1c', flexShrink: 0, position: 'relative', height: '80px' }}
       >
-        {/* Left spacer for perfect centering */}
+        {/* Mobile-only: controls toggle button on the left */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-          {/* Empty to balance the layout and keep controls centered */}
+          <button
+            id="mobile-controls-toggle"
+            onClick={() => setShowMobileControls((v) => !v)}
+            className="flex sm:hidden flex-col items-center justify-center"
+            style={{ background: showMobileControls ? 'rgba(255,255,255,0.1)' : 'none', border: 'none', borderRadius: '10px', cursor: 'pointer', padding: '6px 10px', gap: '3px' }}
+          >
+            <MoreHorizontal size={22} color="#fff" />
+            <span style={{ color: '#e5e7eb', fontSize: '10px', fontWeight: 400 }}>More</span>
+          </button>
         </div>
 
-        {/* Center: Main Controls */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        {/* Center: Main Controls — always visible on desktop, toggled on mobile */}
+        <div
+          className="flex items-center gap-1 sm:gap-2"
+          style={{ display: windowWidth < 640 && !showMobileControls ? 'none' : 'flex' }}
+        >
           {/* Mute */}
           <ControlButton
             id="toggle-mute-btn"
@@ -1403,7 +1418,7 @@ export default function MeetingRoom() {
             active={isMuted}
             icon={isMuted ? <MicOff size={20} color="#ef4444" /> : <Mic size={20} color="#fff" />}
             label="Audio"
-            hasChevron={true}
+            hasChevron={windowWidth >= 640}
           />
 
           {/* Video */}
@@ -1413,7 +1428,7 @@ export default function MeetingRoom() {
             active={isVideoOff}
             icon={isVideoOff ? <VideoOff size={20} color="#ef4444" /> : <Video size={20} color="#fff" />}
             label="Video"
-            hasChevron={true}
+            hasChevron={windowWidth >= 640}
           />
 
           {/* Participants */}
@@ -1445,7 +1460,7 @@ export default function MeetingRoom() {
               </div>
             }
             label="Participants"
-            hasChevron={true}
+            hasChevron={windowWidth >= 640}
           />
 
           {/* Chat */}
@@ -1462,16 +1477,59 @@ export default function MeetingRoom() {
             active={showChat}
             icon={<MessageSquare size={20} color="#fff" />}
             label="Chat"
-            hasChevron={true}
+            hasChevron={windowWidth >= 640}
             badge={unreadCount}
           />
         </div>
 
-        {/* Right: End / Leave Button */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', paddingRight: '12px' }}>
+        {/* Right: End / Leave Button with dropdown confirmation */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', paddingRight: '4px', position: 'relative' }}>
+          {/* Dropdown: appears above the button */}
+          {showEndDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '64px',
+                right: '4px',
+                background: '#1a1a1a',
+                border: '1px solid #333',
+                borderRadius: '10px',
+                padding: '10px',
+                zIndex: 200,
+                minWidth: '200px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              }}
+            >
+              <button
+                id="leave-meeting-btn"
+                onClick={() => { setShowEndDropdown(false); handleLeaveOrEnd(); }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  background: '#e53030',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  padding: '12px 20px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  letterSpacing: '0.01em',
+                  transition: 'background 0.15s',
+                  textAlign: 'center',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#c42020')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#e53030')}
+              >
+                Leave Meeting
+              </button>
+            </div>
+          )}
+
+          {/* The red End/Leave squircle button */}
           <button
             id="end-meeting-btn"
-            onClick={handleLeaveOrEnd}
+            onClick={(e) => { e.stopPropagation(); setShowEndDropdown((v) => !v); }}
             title={isHost ? 'End meeting for all' : 'Leave meeting'}
             style={{
               display: 'flex',
