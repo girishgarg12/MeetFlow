@@ -344,8 +344,23 @@ export default function MeetingRoom() {
 
       // ── Remote video state ──
       else if (message.type === 'video_state' && message.from !== myPeerId) {
-        // key remoteVideoOff by peerId
-        setRemoteVideoOff((prev) => ({ ...prev, [message.from]: message.videoOff }));
+        const remotePeerId = message.from;
+        const videoOff = message.videoOff;
+        setRemoteVideoOff((prev) => ({ ...prev, [remotePeerId]: videoOff }));
+
+        // Imperatively sync the video element so we don't rely solely on React re-render timing
+        const videoEl = document.getElementById(`video-${remotePeerId}`);
+        if (videoEl) {
+          if (videoOff) {
+            // Clear srcObject — removes the frozen last frame so the avatar shows cleanly
+            videoEl.srcObject = null;
+          } else {
+            // Re-attach the stream — replaceTrack delivers new frames into the existing
+            // stream silently without firing ontrack again, so we must re-set srcObject
+            const stream = remoteStreamsRef.current[remotePeerId];
+            if (stream) videoEl.srcObject = stream;
+          }
+        }
       }
 
       // ── Someone left ──
@@ -573,7 +588,7 @@ export default function MeetingRoom() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'video_state',
-        from: userNameRef.current,
+        from: peerIdRef.current,   // must be peerId — remoteVideoOff is keyed by peerId
         videoOff: nextVideoOff,
       }));
     }
