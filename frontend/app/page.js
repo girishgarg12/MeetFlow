@@ -41,7 +41,7 @@ export default function Dashboard() {
       setMeetings(res.data);
       setError('');
     } catch (err) {
-      setError('Could not load meetings. Make sure the backend is running at http://localhost:8000');
+      setError('Could not load meetings. Your network provider might be blocking the server — please try switching to WiFi and refresh.');
     } finally {
       setLoading(false);
       setRefreshing(false);

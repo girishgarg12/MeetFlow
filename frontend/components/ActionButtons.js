@@ -41,7 +41,7 @@ export default function ActionButtons() {
       }
       router.push(`/meeting/${res.data.id}`);
     } catch (err) {
-      alert('Failed to create meeting. Is the backend running at http://localhost:8000?');
+      alert('Failed to create meeting. Please check your connection and try again.');
       setCreating(false);
     }
   };
